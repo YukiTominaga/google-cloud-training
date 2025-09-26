@@ -1,0 +1,80 @@
+import { randomUUID } from 'crypto';
+import { config } from '../config/config.js';
+export class LoggingService {
+  constructor() {
+    console.log('LoggingService initialized');
+  }
+  /**
+   * w3c traceparentヘッダーからtraceIdを抽出
+   */
+  extractTraceId(traceparent) {
+    if (!traceparent) return null;
+    // w3c traceparent format: 00-{trace-id}-{parent-id}-{trace-flags}
+    const parts = traceparent.split('-');
+    if (parts.length === 4 && parts[0] === '00') {
+      return parts[1];
+    }
+    return null;
+  }
+  /**
+   * 構造化ログとして出力（trace情報付き）
+   */
+  logStructuredData(data, traceparent) {
+    const logId = randomUUID();
+    const traceId = this.extractTraceId(traceparent);
+    const structuredLog = {
+      message: 'Request body logged',
+      severity: 'INFO',
+      ...data,
+    };
+    // Google Cloud Loggingのtrace形式でtraceIdを追加
+    if (traceId) {
+      structuredLog['logging.googleapis.com/trace'] =
+        `projects/${config.projectId}/traces/${traceId}`;
+    }
+    // 構造化ログを出力（jsonPayloadとして認識されるように1行で出力）
+    console.log(JSON.stringify(structuredLog));
+    return logId;
+  }
+  /**
+   * Google Cloud Loggingに送信（将来的な拡張用）
+   * 現在はコンソール出力のみ
+   */
+  sendToCloudLogging(logEntry) {
+    // TODO: Google Cloud Logging Clientを使用した実装
+    // 現在は開発用としてコンソール出力のみ
+    console.log(`[CLOUD_LOGGING_PLACEHOLDER] Log entry created with ID: ${logEntry.logId}`);
+  }
+  /**
+   * ログレベル別の出力メソッド
+   */
+  logInfo(message, data) {
+    return this.createLogEntry('INFO', message, data);
+  }
+  logWarn(message, data) {
+    return this.createLogEntry('WARN', message, data);
+  }
+  logError(message, data) {
+    return this.createLogEntry('ERROR', message, data);
+  }
+  logDebug(message, data) {
+    return this.createLogEntry('DEBUG', message, data);
+  }
+  /**
+   * ログエントリを作成
+   */
+  createLogEntry(level, message, data) {
+    const logId = randomUUID();
+    const timestamp = new Date().toISOString();
+    const logEntry = {
+      logId,
+      timestamp,
+      level,
+      message,
+      data: data || null,
+    };
+    // jsonPayloadとして認識されるように1行で出力
+    console.log(JSON.stringify(logEntry));
+    return logId;
+  }
+}

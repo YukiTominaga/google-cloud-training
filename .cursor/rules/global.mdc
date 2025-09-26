@@ -1,0 +1,317 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Hono TypeScript サーバーサイド開発ガイド
+
+## 🎯 プロジェクトの原則
+- **型安全性**: TypeScriptの型システムを最大限活用し、実行時エラーを最小化
+- **SOLID原則**: 保守性と拡張性を重視した設計
+- **Clean Architecture**: 関心の分離と依存関係の明確化
+- **Honoベストプラクティス**: パフォーマンスと開発体験を両立
+
+## 📁 推奨ディレクトリ構造
+```
+src/
+├── routes/           # ルート定義（エンドポイント）
+├── controllers/      # リクエスト/レスポンス処理
+├── services/         # ビジネスロジック
+├── repositories/     # データアクセス層
+├── models/           # データモデル・スキーマ
+├── middlewares/      # ミドルウェア
+├── libs/             # 外部SDK・API ラッパー
+├── types/            # 型定義
+├── validators/       # バリデーション
+├── utils/            # ユーティリティ関数
+├── constants/        # 定数定義
+├── config/           # 設定管理
+├── logger.ts         # ログ設定
+└── index.ts          # エントリーポイント
+```
+
+## 🚀 Honoベストプラクティス
+
+### ✅ 推奨
+```typescript
+// ✅ 型推論を活用したルート定義
+app.get('/users/:id', (c) => {
+  const id = c.req.param('id') // 型推論が効く
+  return c.json({ id })
+})
+
+// ✅ app.route()を使用したモジュール化
+import users from './routes/users'
+app.route('/api/users', users)
+
+// ✅ factory.createHandlers()を使用（必要に応じて）
+import { createFactory } from 'hono/factory'
+const factory = createFactory()
+const handlers = factory.createHandlers(middleware, handler)
+```
+
+### ❌ 非推奨
+```typescript
+// ❌ Rails風のコントローラー
+const userController = (c: Context) => {
+  const id = c.req.param('id') // 型推論が効かない
+  return c.json({ id })
+}
+app.get('/users/:id', userController)
+```
+
+## 🛠️ TypeScriptベストプラクティス
+
+### 型定義
+```typescript
+// 厳格な型定義を使用
+interface User {
+  readonly id: string
+  name: string
+  email: string
+  createdAt: Date
+}
+
+// DTOの明確な定義
+interface CreateUserDTO {
+  name: string
+  email: string
+}
+
+// レスポンス型の定義
+interface ApiResponse<T> {
+  success: boolean
+  data?: T
+  error?: string
+}
+```
+
+### 環境変数の管理
+```typescript
+// env.ts
+import { z } from 'zod'
+
+const envSchema = z.object({
+  PORT: z.coerce.number().default(3000),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  DATABASE_URL: z.string(),
+})
+
+export const env = envSchema.parse(process.env)
+```
+
+## 🧩 SOLID原則の適用
+
+### Single Responsibility Principle (SRP)
+```typescript
+// ✅ 単一の責任を持つクラス
+class UserService {
+  constructor(private userRepo: UserRepository) {}
+
+  async createUser(userData: CreateUserDTO): Promise<User> {
+    // ユーザー作成のビジネスロジックのみ
+  }
+}
+
+class UserRepository {
+  async save(user: User): Promise<User> {
+    // データ永続化のみ
+  }
+}
+```
+
+### Open/Closed Principle (OCP)
+```typescript
+// ✅ 拡張に開かれ、変更に閉じられた設計
+interface NotificationService {
+  send(message: string): Promise<void>
+}
+
+class EmailService implements NotificationService {
+  async send(message: string): Promise<void> {
+    // メール送信実装
+  }
+}
+
+class SlackService implements NotificationService {
+  async send(message: string): Promise<void> {
+    // Slack送信実装
+  }
+}
+```
+
+### Dependency Inversion Principle (DIP)
+```typescript
+// ✅ 抽象に依存する設計
+interface IUserRepository {
+  findById(id: string): Promise<User | null>
+  save(user: User): Promise<User>
+}
+
+class UserService {
+  constructor(private userRepo: IUserRepository) {}
+
+  async getUser(id: string): Promise<User | null> {
+    return await this.userRepo.findById(id)
+  }
+}
+```
+
+## 🔍 エラーハンドリング
+
+### 統一されたエラーレスポンス
+```typescript
+class AppError extends Error {
+  constructor(
+    public statusCode: number,
+    public message: string,
+    public isOperational = true
+  ) {
+    super(message)
+  }
+}
+
+// グローバルエラーハンドラー
+app.onError((err, c) => {
+  if (err instanceof AppError) {
+    return c.json({ error: err.message }, err.statusCode)
+  }
+
+  console.error(err)
+  return c.json({ error: 'Internal Server Error' }, 500)
+})
+```
+
+## 🧪 テストガイドライン
+
+### ユニットテスト
+```typescript
+// services/user.service.test.ts
+describe('UserService', () => {
+  let userService: UserService
+  let mockUserRepo: jest.Mocked<IUserRepository>
+
+  beforeEach(() => {
+    mockUserRepo = {
+      findById: jest.fn(),
+      save: jest.fn(),
+    }
+    userService = new UserService(mockUserRepo)
+  })
+
+  it('should return user when found', async () => {
+    const mockUser = { id: '1', name: 'Test User', email: 'test@example.com' }
+    mockUserRepo.findById.mockResolvedValue(mockUser)
+
+    const result = await userService.getUser('1')
+
+    expect(result).toEqual(mockUser)
+    expect(mockUserRepo.findById).toHaveBeenCalledWith('1')
+  })
+})
+```
+
+## 📝 バリデーション
+
+### Zodを使用した型安全なバリデーション
+```typescript
+import { z } from 'zod'
+import { zValidator } from '@hono/zod-validator'
+
+const createUserSchema = z.object({
+  name: z.string().min(1).max(100),
+  email: z.string().email(),
+})
+
+app.post('/users', zValidator('json', createUserSchema), async (c) => {
+  const userData = c.req.valid('json') // 型安全
+  // ユーザー作成処理
+})
+```
+
+## 🔧 開発ツール設定
+
+### ESLint + Prettier
+```json
+// .eslintrc.js
+{
+  "extends": [
+    "@typescript-eslint/recommended",
+    "@typescript-eslint/recommended-requiring-type-checking",
+    "prettier"
+  ],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/prefer-const": "error",
+    "@typescript-eslint/no-explicit-any": "error"
+  }
+}
+```
+
+### TypeScript設定
+```json
+// tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "noUncheckedIndexedAccess": true
+  }
+}
+```
+
+## 📈 パフォーマンス最適化
+
+### 効率的なミドルウェア使用
+```typescript
+import { cors } from 'hono/cors'
+import { logger } from 'hono/logger'
+import { compress } from 'hono/compress'
+
+app.use('*', cors())
+app.use('*', logger())
+app.use('*', compress())
+```
+
+### 適切なHTTPステータスコードの使用
+```typescript
+app.post('/users', async (c) => {
+  const user = await userService.create(userData)
+  return c.json(user, 201) // Created
+})
+
+app.get('/users/:id', async (c) => {
+  const user = await userService.findById(id)
+  if (!user) {
+    return c.json({ error: 'User not found' }, 404)
+  }
+  return c.json(user, 200)
+})
+```
+
+## 💡 コード品質チェックリスト
+
+### 新しいコードを書く際の確認事項
+- [ ] 型安全性が確保されているか
+- [ ] SOLID原則に従っているか
+- [ ] 適切なエラーハンドリングが実装されているか
+- [ ] テストが書かれているか
+- [ ] パフォーマンスへの影響を考慮しているか
+- [ ] セキュリティ要件を満たしているか
+- [ ] ログが適切に出力されているか
+
+## 🎯 実装時の重要な考慮事項
+1. **型推論を活用**: TypeScriptの型システムを最大限活用
+2. **依存関係の明確化**: DIコンテナやファクトリーパターンの使用
+3. **テスタビリティ**: モックしやすい設計
+4. **パフォーマンス**: 不要な処理の削除と最適化
+5. **保守性**: 将来の変更に対する柔軟性
+
+このガイドラインに従って、保守性が高く、拡張可能で、型安全なHonoアプリケーションを構築してください。

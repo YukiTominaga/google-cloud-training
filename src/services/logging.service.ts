@@ -68,8 +68,31 @@ export class LoggingService {
     return this.createLogEntry('WARN', message, data);
   }
 
-  logError(message: string, data?: any): string {
-    return this.createLogEntry('ERROR', message, data);
+  logError(message: string, error?: Error | any, traceparent?: string): string {
+    const logId = randomUUID();
+    const traceId = this.extractTraceId(traceparent);
+
+    // Google Cloud Error Reporting形式のjsonPayload
+    const errorLog: any = {
+      '@type': 'type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent',
+      message: message,
+      severity: 'ERROR',
+    };
+
+    // エラーオブジェクトがある場合はスタックトレースを追加
+    if (error && error instanceof Error && error.stack) {
+      errorLog.message = `${message}: ${error.message}`;
+      errorLog.stack_trace = error.stack;
+    }
+
+    // traceIdがある場合は追加
+    if (traceId) {
+      errorLog['logging.googleapis.com/trace'] = `projects/${config.projectId}/traces/${traceId}`;
+    }
+
+    // jsonPayloadとして認識されるように1行で出力
+    console.log(JSON.stringify(errorLog));
+    return logId;
   }
 
   logDebug(message: string, data?: any): string {

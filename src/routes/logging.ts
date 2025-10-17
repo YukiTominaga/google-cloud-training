@@ -26,7 +26,9 @@ logging.post('/structure', async (c) => {
 
     return c.json(response);
   } catch (error) {
-    console.error('Error processing logging request:', error);
+    // Error Reporting形式でエラーログ出力
+    const traceparent = c.req.header('traceparent');
+    loggingService.logError('Error processing logging request', error, traceparent);
 
     const errorResponse: LogStructureResponse = {
       success: false,
@@ -53,7 +55,10 @@ logging.post('/test/:level', async (c) => {
         logId = loggingService.logWarn('Test warning log', body);
         break;
       case 'error':
-        logId = loggingService.logError('Test error log', body);
+        // Error Reporting形式でログ出力（テスト用のエラーを作成）
+        const testError = new Error('Test error occurred');
+        const traceparent = c.req.header('traceparent');
+        logId = loggingService.logError('Test error log', testError, traceparent);
         break;
       case 'debug':
         logId = loggingService.logDebug('Test debug log', body);
@@ -67,8 +72,31 @@ logging.post('/test/:level', async (c) => {
       message: `${level.toUpperCase()} level log created`,
     });
   } catch (error) {
-    console.error('Error in test logging:', error);
+    // Error Reporting形式でエラーログ出力
+    const traceparent = c.req.header('traceparent');
+    loggingService.logError('Error in test logging', error, traceparent);
     return c.json({ error: 'Failed to create test log' }, 500);
+  }
+});
+
+// エラーシミュレーション用エンドポイント
+logging.get('/error-test', (c) => {
+  const traceparent = c.req.header('traceparent');
+
+  try {
+    // 意図的にエラーを発生させる
+    throw new Error('Simulated application error for Error Reporting test');
+  } catch (error) {
+    // Error Reporting形式でログ出力
+    loggingService.logError('Application error occurred', error, traceparent);
+
+    return c.json(
+      {
+        error: 'Internal server error',
+        message: 'Error has been logged to Error Reporting',
+      },
+      500,
+    );
   }
 });
 
@@ -95,11 +123,28 @@ logging.get('/info', (c) => {
       },
       {
         endpoint: 'POST /logging/test/:level',
-        description: 'ログレベル別のテスト用エンドポイント',
+        description: 'ログレベル別のテスト用エンドポイント（errorの場合はError Reporting形式）',
         levels: ['info', 'warn', 'error', 'debug'],
         example: {
-          url: 'POST /logging/test/info',
+          url: 'POST /logging/test/error',
+          headers: {
+            traceparent: '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01',
+          },
           body: { message: 'Test data', value: 42 },
+        },
+      },
+      {
+        endpoint: 'GET /logging/error-test',
+        description: 'Error Reporting形式でエラーをログ出力するテスト用エンドポイント',
+        example: {
+          url: 'GET /logging/error-test',
+          headers: {
+            traceparent: '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01',
+          },
+          response: {
+            error: 'Internal server error',
+            message: 'Error has been logged to Error Reporting',
+          },
         },
       },
     ],

@@ -1,8 +1,13 @@
+// OpenTelemetryの初期化を最初に実行
+import { startTracing } from './config/tracing.js';
+startTracing();
+
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { config, validateConfig } from './config/config.js';
 import logging from './routes/logging.js';
 import monitoring from './routes/monitoring.js';
+import trace from './routes/trace.js';
 
 // アプリケーション設定の検証
 const configValidation = validateConfig();
@@ -29,6 +34,9 @@ app.route('/monitoring', monitoring);
 
 // loggingルートを統合
 app.route('/logging', logging);
+
+// traceルートを統合
+app.route('/trace', trace);
 
 serve(
   {

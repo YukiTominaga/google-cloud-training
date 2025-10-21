@@ -4,13 +4,13 @@ export interface Config {
   projectId: string;
   nodeEnv: string;
   port: number;
-  enableLocalTesting: boolean;
+  enableDebugLogging: boolean;
 }
 
 // 統合設定オブジェクト
 export const config: Config = {
   // Google Cloud Project ID（必須）
-  projectId: process.env.GOOGLE_CLOUD_PROJECT || 'your-project-id',
+  projectId: process.env.GOOGLE_CLOUD_PROJECT || '',
 
   // 実行環境
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -18,15 +18,15 @@ export const config: Config = {
   // サーバーポート
   port: parseInt(process.env.PORT || '3000', 10),
 
-  // ローカル開発時のテスト用フラグ
-  enableLocalTesting: (process.env.NODE_ENV || 'development') === 'development',
+  // デバッグログ出力フラグ
+  enableDebugLogging: process.env.DEBUG_LOGGING === 'true',
 };
 
 // 設定の検証
 export function validateConfig(): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
 
-  if (!config.projectId || config.projectId === 'your-project-id') {
+  if (!config.projectId) {
     errors.push('GOOGLE_CLOUD_PROJECT environment variable is required');
   }
 

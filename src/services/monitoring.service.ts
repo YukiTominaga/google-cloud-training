@@ -1,6 +1,10 @@
 import { MetricServiceClient } from '@google-cloud/monitoring';
 import { config, validateConfig } from '../config/config.js';
-import type { CustomMetricRequest, MetricDescriptor } from '../types/monitoring.js';
+import type {
+  CustomMetricRequest,
+  MetricDescriptor,
+  MonitoredResource,
+} from '../types/monitoring.js';
 
 export class MonitoringService {
   private client: MetricServiceClient;
@@ -11,7 +15,7 @@ export class MonitoringService {
     const configValidation = validateConfig();
     this.isConfigValid = configValidation.isValid;
 
-    if (!this.isConfigValid && !config.enableLocalTesting) {
+    if (!this.isConfigValid) {
       console.warn('Google Cloud Monitoring configuration errors:', configValidation.errors);
     }
 
@@ -26,7 +30,7 @@ export class MonitoringService {
    * 設定が有効かどうかをチェック
    */
   private checkConfig(): void {
-    if (!this.isConfigValid && !config.enableLocalTesting) {
+    if (!this.isConfigValid) {
       throw new Error(
         'Google Cloud Monitoring is not properly configured. Check GOOGLE_CLOUD_PROJECT environment variable and ensure ADC is set up.',
       );
@@ -34,15 +38,38 @@ export class MonitoringService {
   }
 
   /**
+   * メトリックのバリデーション
+   */
+  private validateMetric(metric: CustomMetricRequest): void {
+    if (!metric.metricType) {
+      throw new Error('metricType is required');
+    }
+    if (typeof metric.value !== 'number' || isNaN(metric.value)) {
+      throw new Error('value must be a valid number');
+    }
+  }
+
+  /**
+   * モニタリングリソースを取得
+   */
+  private getMonitoredResource(): MonitoredResource {
+    return {
+      type: 'generic_task',
+      labels: {
+        project_id: this.projectId,
+        location: 'global',
+        namespace: 'hono-app',
+        job: 'custom-metrics',
+        task_id: process.env.HOSTNAME || 'local-instance',
+      },
+    };
+  }
+
+  /**
    * カスタム指標の定義を作成
    */
   async createMetricDescriptor(descriptor: MetricDescriptor): Promise<void> {
     this.checkConfig();
-
-    if (config.enableLocalTesting) {
-      console.log(`[LOCAL TEST] Would create metric descriptor: ${descriptor.type}`);
-      return;
-    }
 
     const projectName = this.client.projectPath(this.projectId);
 
@@ -58,14 +85,23 @@ export class MonitoringService {
       },
     };
 
+    if (config.enableDebugLogging) {
+      console.log('[Monitoring] Creating metric descriptor:', JSON.stringify(request, null, 2));
+    }
+
     try {
       const [result] = await this.client.createMetricDescriptor(request);
-      console.log(`Created metric descriptor: ${result.name}`);
+      console.log(`✓ Created metric descriptor: ${result.name}`);
     } catch (error) {
       // 既に存在する場合はエラーをログに出力するが処理は継続
       if (error instanceof Error && error.message.includes('already exists')) {
-        console.log(`Metric descriptor already exists: ${descriptor.type}`);
+        console.log(`ℹ Metric descriptor already exists: ${descriptor.type}`);
       } else {
+        console.error('[Monitoring Error] Failed to create metric descriptor:', {
+          metricType: descriptor.type,
+          error: error instanceof Error ? error.message : error,
+          stack: error instanceof Error ? error.stack : undefined,
+        });
         throw error;
       }
     }
@@ -73,18 +109,39 @@ export class MonitoringService {
 
   /**
    * カスタム指標を送信
+   * @param metric - 送信するメトリックデータ
+   * @param autoCreateDescriptor - メトリックディスクリプタが存在しない場合に自動作成するか（デフォルト: false）
    */
-  async sendCustomMetric(metric: CustomMetricRequest): Promise<void> {
+  async sendCustomMetric(
+    metric: CustomMetricRequest,
+    autoCreateDescriptor: boolean = false,
+  ): Promise<void> {
     this.checkConfig();
+    this.validateMetric(metric);
 
-    if (config.enableLocalTesting) {
-      console.log(`[LOCAL TEST] Would send metric:`, {
-        type: metric.metricType,
-        value: metric.value,
-        labels: metric.labels,
-        timestamp: new Date().toISOString(),
-      });
-      return;
+    // 自動作成が有効な場合、メトリックディスクリプタを作成を試みる
+    if (autoCreateDescriptor) {
+      try {
+        await this.createMetricDescriptor({
+          type: metric.metricType,
+          metricKind: 'GAUGE',
+          valueType: 'DOUBLE',
+          description: metric.description || `Custom metric: ${metric.metricType}`,
+          displayName: metric.metricType.split('/').pop() || metric.metricType,
+          labels: metric.labels
+            ? Object.keys(metric.labels).map((key) => ({
+                key,
+                valueType: 'STRING' as const,
+                description: `Label: ${key}`,
+              }))
+            : [],
+        });
+      } catch (error) {
+        // エラーは無視（既に存在する場合など）
+        if (config.enableDebugLogging) {
+          console.log('[Monitoring] Metric descriptor creation skipped:', error);
+        }
+      }
     }
 
     const projectName = this.client.projectPath(this.projectId);
@@ -94,12 +151,19 @@ export class MonitoringService {
     const seconds = Math.floor(now.getTime() / 1000);
     const nanos = (now.getTime() % 1000) * 1000000;
 
+    // GAUGEメトリックの場合はstartTimeとendTimeを同じにする
     const timeInterval = {
       endTime: {
         seconds: seconds,
         nanos: nanos,
       },
+      startTime: {
+        seconds: seconds,
+        nanos: nanos,
+      },
     };
+
+    const monitoredResource = this.getMonitoredResource();
 
     const request = {
       name: projectName,
@@ -109,12 +173,7 @@ export class MonitoringService {
             type: `custom.googleapis.com/${metric.metricType}`,
             labels: metric.labels || {},
           },
-          resource: {
-            type: 'global',
-            labels: {
-              project_id: this.projectId,
-            },
-          },
+          resource: monitoredResource,
           points: [
             {
               interval: timeInterval,
@@ -127,7 +186,41 @@ export class MonitoringService {
       ],
     };
 
-    await this.client.createTimeSeries(request);
+    if (config.enableDebugLogging) {
+      console.log('[Monitoring] Sending metric:', JSON.stringify(request, null, 2));
+    }
+
+    try {
+      await this.client.createTimeSeries(request);
+      console.log(`✓ Metric sent successfully: ${metric.metricType} = ${metric.value}`);
+    } catch (error: any) {
+      // より詳細なエラー情報を抽出
+      const errorDetails = {
+        metricType: metric.metricType,
+        value: metric.value,
+        labels: metric.labels,
+        message: error instanceof Error ? error.message : String(error),
+        code: error?.code,
+        details: error?.details,
+        metadata: error?.metadata,
+      };
+
+      console.error('[Monitoring Error] Failed to send metric:', errorDetails);
+
+      // より分かりやすいエラーメッセージを生成
+      let userFriendlyMessage = error instanceof Error ? error.message : String(error);
+
+      if (error?.message?.includes('not exist')) {
+        userFriendlyMessage = `Metric descriptor for "${metric.metricType}" does not exist. Create it first using createMetricDescriptor().`;
+      } else if (error?.message?.includes('TimeSeries could not be written')) {
+        userFriendlyMessage = `Failed to write metric "${metric.metricType}". This may be due to: 1) Missing metric descriptor, 2) Invalid labels, 3) Invalid resource type. Original error: ${error.message}`;
+      }
+
+      const enhancedError = new Error(userFriendlyMessage);
+      (enhancedError as any).originalError = error;
+      (enhancedError as any).details = errorDetails;
+      throw enhancedError;
+    }
   }
 
   /**
@@ -153,13 +246,26 @@ export class MonitoringService {
     ];
 
     // 指標定義を作成（初回のみ）
+    // ラベルを定義に含める
     for (const metric of sampleMetrics) {
       await this.createMetricDescriptor({
         type: metric.metricType,
         metricKind: 'GAUGE',
         valueType: 'DOUBLE',
         description: metric.description,
-        displayName: metric.metricType.replace('application/', '').replace('_', ' '),
+        displayName: metric.metricType.replace('application/', '').replace(/_/g, ' '),
+        labels: [
+          {
+            key: 'environment',
+            valueType: 'STRING',
+            description: 'Environment name (development, production, etc.)',
+          },
+          {
+            key: 'instance',
+            valueType: 'STRING',
+            description: 'Instance identifier',
+          },
+        ],
       });
     }
 
@@ -191,8 +297,9 @@ export class MonitoringService {
     return {
       isValid: this.isConfigValid,
       projectId: this.projectId,
-      enableLocalTesting: config.enableLocalTesting,
+      enableDebugLogging: config.enableDebugLogging,
       authMethod: 'Application Default Credentials (ADC)',
+      monitoredResourceType: 'generic_task',
       errors: validation.errors,
     };
   }

@@ -29,6 +29,22 @@ app.get('/', (c) => {
   return c.text('Hello Hono!');
 });
 
+// トップレベルのヘルスチェックエンドポイント
+// GCLB/GKE から渡されるトレース関連ヘッダーをログ出力する
+app.get('/health', (c) => {
+  const traceparent = c.req.header('traceparent') || null;
+  const xCloudTraceContext = c.req.header('x-cloud-trace-context') || null;
+
+  return c.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    headers: {
+      traceparent,
+      'x-cloud-trace-context': xCloudTraceContext,
+    },
+  });
+});
+
 // monitoringルートを統合
 app.route('/monitoring', monitoring);
 
@@ -45,6 +61,6 @@ serve(
   },
   (info) => {
     console.log(`Server is running on http://localhost:${info.port}`);
-    console.log(`Health check available at: http://localhost:${info.port}/monitoring/health`);
+    console.log(`Health check available at: http://localhost:${info.port}/health`);
   },
 );

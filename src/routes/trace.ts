@@ -14,18 +14,18 @@ trace.get('/demo', async (c) => {
     // カスタムspanを作成して処理を実行
     const result = await loggingService.withSpan('demo-operation', async (span) => {
       // span内でログを出力（自動的にtrace情報が付与される）
-      loggingService.logInfo('Starting demo operation', { step: 1 });
+      loggingService.logInfoWithContext(c, 'Starting demo operation', { step: 1 });
 
       // 何か処理をシミュレート
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // span属性を追加
       span.setAttribute('demo.step', '2');
-      loggingService.logInfo('Processing demo operation', { step: 2 });
+      loggingService.logInfoWithContext(c, 'Processing demo operation', { step: 2 });
 
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      loggingService.logInfo('Completed demo operation', { step: 3 });
+      loggingService.logInfoWithContext(c, 'Completed demo operation', { step: 3 });
 
       return { message: 'Demo operation completed', timestamp: new Date().toISOString() };
     });
@@ -52,21 +52,21 @@ trace.get('/demo', async (c) => {
 trace.get('/nested', async (c) => {
   try {
     const result = await loggingService.withSpan('parent-operation', async (parentSpan) => {
-      loggingService.logInfo('Parent operation started');
+      loggingService.logInfoWithContext(c, 'Parent operation started');
       parentSpan.setAttribute('operation.type', 'parent');
 
       // 子spanを作成
       const childResult = await loggingService.withSpan('child-operation', async (childSpan) => {
-        loggingService.logInfo('Child operation started');
+        loggingService.logInfoWithContext(c, 'Child operation started');
         childSpan.setAttribute('operation.type', 'child');
 
         await new Promise((resolve) => setTimeout(resolve, 50));
 
-        loggingService.logInfo('Child operation completed');
+        loggingService.logInfoWithContext(c, 'Child operation completed');
         return { child: 'completed' };
       });
 
-      loggingService.logInfo('Parent operation completed', childResult);
+      loggingService.logInfoWithContext(c, 'Parent operation completed', childResult);
       return { parent: 'completed', child: childResult };
     });
 
@@ -93,7 +93,7 @@ trace.get('/nested', async (c) => {
 trace.get('/error', async (c) => {
   try {
     await loggingService.withSpan('error-operation', async (span) => {
-      loggingService.logInfo('Operation started');
+      loggingService.logInfoWithContext(c, 'Operation started');
       span.setAttribute('will.fail', 'true');
 
       // 意図的にエラーを発生させる
@@ -123,7 +123,7 @@ trace.get('/slow', async (c) => {
     const result = await loggingService.withSpan('long-process-operation', async (parentSpan) => {
       parentSpan.setAttribute('operation.type', 'long-running');
       parentSpan.setAttribute('operation.steps', 4);
-      loggingService.logInfo('Long process started', { totalSteps: 4 });
+      loggingService.logInfoWithContext(c, 'Long process started', { totalSteps: 4 });
 
       const results: any[] = [];
 
@@ -131,13 +131,15 @@ trace.get('/slow', async (c) => {
       const step1Result = await loggingService.withSpan('step-1-fetch-data', async (span) => {
         span.setAttribute('step.number', 1);
         span.setAttribute('step.name', 'fetch-data');
-        loggingService.logInfo('Step 1: Fetching data from database', { step: 1 });
+        loggingService.logInfoWithContext(c, 'Step 1: Fetching data from database', {
+          step: 1,
+        });
 
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         const data = { records: 1000, fetchTime: 2000 };
         span.setAttribute('step.records', data.records);
-        loggingService.logInfo('Step 1: Data fetched successfully', data);
+        loggingService.logInfoWithContext(c, 'Step 1: Data fetched successfully', data);
 
         return data;
       });
@@ -147,7 +149,7 @@ trace.get('/slow', async (c) => {
       const step2Result = await loggingService.withSpan('step-2-process-data', async (span) => {
         span.setAttribute('step.number', 2);
         span.setAttribute('step.name', 'process-data');
-        loggingService.logInfo('Step 2: Processing data', {
+        loggingService.logInfoWithContext(c, 'Step 2: Processing data', {
           step: 2,
           inputRecords: step1Result.records,
         });
@@ -156,7 +158,7 @@ trace.get('/slow', async (c) => {
 
         const processed = { processedRecords: step1Result.records, processingTime: 3000 };
         span.setAttribute('step.processed_records', processed.processedRecords);
-        loggingService.logInfo('Step 2: Data processed successfully', processed);
+        loggingService.logInfoWithContext(c, 'Step 2: Data processed successfully', processed);
 
         return processed;
       });
@@ -166,7 +168,7 @@ trace.get('/slow', async (c) => {
       const step3Result = await loggingService.withSpan('step-3-validate-data', async (span) => {
         span.setAttribute('step.number', 3);
         span.setAttribute('step.name', 'validate-data');
-        loggingService.logInfo('Step 3: Validating processed data', {
+        loggingService.logInfoWithContext(c, 'Step 3: Validating processed data', {
           step: 3,
           recordsToValidate: step2Result.processedRecords,
         });
@@ -180,7 +182,7 @@ trace.get('/slow', async (c) => {
         };
         span.setAttribute('step.valid_records', validated.validRecords);
         span.setAttribute('step.invalid_records', validated.invalidRecords);
-        loggingService.logInfo('Step 3: Validation completed', validated);
+        loggingService.logInfoWithContext(c, 'Step 3: Validation completed', validated);
 
         return validated;
       });
@@ -190,7 +192,7 @@ trace.get('/slow', async (c) => {
       const step4Result = await loggingService.withSpan('step-4-save-data', async (span) => {
         span.setAttribute('step.number', 4);
         span.setAttribute('step.name', 'save-data');
-        loggingService.logInfo('Step 4: Saving validated data', {
+        loggingService.logInfoWithContext(c, 'Step 4: Saving validated data', {
           step: 4,
           recordsToSave: step3Result.validRecords,
         });
@@ -199,14 +201,14 @@ trace.get('/slow', async (c) => {
 
         const saved = { savedRecords: step3Result.validRecords, saveTime: 2500 };
         span.setAttribute('step.saved_records', saved.savedRecords);
-        loggingService.logInfo('Step 4: Data saved successfully', saved);
+        loggingService.logInfoWithContext(c, 'Step 4: Data saved successfully', saved);
 
         return saved;
       });
       results.push(step4Result);
 
       parentSpan.setAttribute('operation.completed', true);
-      loggingService.logInfo('Long process completed successfully', {
+      loggingService.logInfoWithContext(c, 'Long process completed successfully', {
         totalTime: '~10s',
         steps: results,
       });

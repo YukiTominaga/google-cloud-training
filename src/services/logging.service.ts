@@ -2,6 +2,7 @@ import { type Span, SpanStatusCode, trace } from '@opentelemetry/api';
 import { randomUUID } from 'crypto';
 import { config } from '../config/config.js';
 import type { LogEntry, LogStructureRequest } from '../types/logging.js';
+import type { Context } from 'hono';
 
 export class LoggingService {
   private tracer = trace.getTracer('logging-service');
@@ -26,6 +27,27 @@ export class LoggingService {
   }
 
   /**
+   * X-Cloud-Trace-ContextヘッダーからtraceIdを抽出
+   * 形式の例: TRACE_ID/SPAN_ID;o=TRACE_TRUE
+   */
+  private extractTraceIdFromXCloudTraceContext(header?: string): string | null {
+    if (!header) return null;
+
+    const [traceAndSpan] = header.split(';', 1);
+    if (!traceAndSpan) return null;
+
+    const [traceId] = traceAndSpan.split('/', 1);
+    if (!traceId) return null;
+
+    // Cloud TraceのtraceIdは通常32桁の16進数
+    if (!/^[0-9a-fA-F]{16,32}$/.test(traceId)) {
+      return null;
+    }
+
+    return traceId;
+  }
+
+  /**
    * 現在のアクティブなspanからtrace情報を取得
    */
   private getCurrentTraceInfo(): { traceId: string | null; spanId: string | null } {
@@ -44,9 +66,30 @@ export class LoggingService {
   /**
    * Cloud Logging形式のtrace/span情報を追加
    */
-  private addTraceContext(logEntry: any, traceparent?: string): void {
-    // まずOpenTelemetryのアクティブなspanから取得を試みる
-    const { traceId, spanId } = this.getCurrentTraceInfo();
+  private addTraceContext(
+    logEntry: any,
+    traceparent?: string,
+    xCloudTraceContext?: string,
+  ): void {
+    // spanId は常に現在のアクティブspanから取得しておく
+    const current = this.getCurrentTraceInfo();
+    let traceId: string | null = null;
+    const spanId: string | null = current.spanId;
+
+    // 1. traceparentヘッダーを最優先で使用
+    if (traceparent) {
+      traceId = this.extractTraceId(traceparent);
+    }
+
+    // 2. traceparentが無い／不正な場合は X-Cloud-Trace-Context を使用
+    if (!traceId && xCloudTraceContext) {
+      traceId = this.extractTraceIdFromXCloudTraceContext(xCloudTraceContext);
+    }
+
+    // 3. どちらのヘッダーも無い場合は現在のアクティブなspanを使用
+    if (!traceId) {
+      traceId = current.traceId;
+    }
 
     if (traceId) {
       // Google Cloud Logging形式でtraceIdを追加
@@ -56,20 +99,17 @@ export class LoggingService {
         // spanIdも追加（Cloud LoggingとCloud Traceの連携に使用）
         logEntry['logging.googleapis.com/spanId'] = spanId;
       }
-    } else if (traceparent) {
-      // フォールバック: traceparentヘッダーから抽出
-      const extractedTraceId = this.extractTraceId(traceparent);
-      if (extractedTraceId) {
-        logEntry['logging.googleapis.com/trace'] =
-          `projects/${config.projectId}/traces/${extractedTraceId}`;
-      }
     }
   }
 
   /**
    * 構造化ログとして出力（trace情報付き）
    */
-  logStructuredData(data: LogStructureRequest, traceparent?: string): string {
+  logStructuredData(
+    data: LogStructureRequest,
+    traceparent?: string,
+    xCloudTraceContext?: string,
+  ): string {
     const logId = randomUUID();
 
     const structuredLog: any = {
@@ -79,12 +119,31 @@ export class LoggingService {
     };
 
     // OpenTelemetry spanからtrace情報を追加
-    this.addTraceContext(structuredLog, traceparent);
+    this.addTraceContext(structuredLog, traceparent, xCloudTraceContext);
 
     // 構造化ログを出力（jsonPayloadとして認識されるように1行で出力）
     console.log(JSON.stringify(structuredLog));
 
     return logId;
+  }
+
+  /**
+   * HonoのContextからヘッダーを解決
+   * （将来ミドルウェアで c.set(...) した場合も考慮）
+   */
+  private resolveTraceHeadersFromContext(
+    c: Context,
+  ): { traceparent?: string; xCloudTraceContext?: string } {
+    const traceparent =
+      (c.get?.('traceparent') as string | undefined) ??
+      c.req.header('traceparent') ??
+      undefined;
+    const xCloudTraceContext =
+      (c.get?.('xCloudTraceContext') as string | undefined) ??
+      c.req.header('x-cloud-trace-context') ??
+      undefined;
+
+    return { traceparent, xCloudTraceContext };
   }
 
   /**
@@ -99,16 +158,33 @@ export class LoggingService {
 
   /**
    * ログレベル別の出力メソッド
+   * HTTPコンテキストがある場合はtraceparent/x-cloud-trace-contextを渡すことで、
+   * ヘッダーを優先してtraceIdを決定する。
    */
-  logInfo(message: string, data?: any): string {
-    return this.createLogEntry('INFO', message, data);
+  logInfo(
+    message: string,
+    data?: any,
+    traceparent?: string,
+    xCloudTraceContext?: string,
+  ): string {
+    return this.createLogEntry('INFO', message, data, traceparent, xCloudTraceContext);
   }
 
-  logWarn(message: string, data?: any): string {
-    return this.createLogEntry('WARN', message, data);
+  logWarn(
+    message: string,
+    data?: any,
+    traceparent?: string,
+    xCloudTraceContext?: string,
+  ): string {
+    return this.createLogEntry('WARN', message, data, traceparent, xCloudTraceContext);
   }
 
-  logError(message: string, error?: Error | any, traceparent?: string): string {
+  logError(
+    message: string,
+    error?: Error | any,
+    traceparent?: string,
+    xCloudTraceContext?: string,
+  ): string {
     const logId = randomUUID();
 
     // Google Cloud Error Reporting形式のjsonPayload
@@ -124,22 +200,62 @@ export class LoggingService {
       errorLog.stack_trace = error.stack;
     }
 
-    // OpenTelemetry spanからtrace情報を追加
-    this.addTraceContext(errorLog, traceparent);
+    // OpenTelemetry spanまたはHTTPヘッダーからtrace情報を追加
+    this.addTraceContext(errorLog, traceparent, xCloudTraceContext);
 
     // jsonPayloadとして認識されるように1行で出力
     console.log(JSON.stringify(errorLog));
     return logId;
   }
 
-  logDebug(message: string, data?: any): string {
-    return this.createLogEntry('DEBUG', message, data);
+  logDebug(
+    message: string,
+    data?: any,
+    traceparent?: string,
+    xCloudTraceContext?: string,
+  ): string {
+    return this.createLogEntry('DEBUG', message, data, traceparent, xCloudTraceContext);
+  }
+
+  /**
+   * Hono Context 付きのヘルパー
+   * すべてのエンドポイントでヘッダー処理を共通化するためのラッパー
+   */
+  logStructuredDataWithContext(c: Context, data: LogStructureRequest): string {
+    const { traceparent, xCloudTraceContext } = this.resolveTraceHeadersFromContext(c);
+    return this.logStructuredData(data, traceparent, xCloudTraceContext);
+  }
+
+  logInfoWithContext(c: Context, message: string, data?: any): string {
+    const { traceparent, xCloudTraceContext } = this.resolveTraceHeadersFromContext(c);
+    return this.logInfo(message, data, traceparent, xCloudTraceContext);
+  }
+
+  logWarnWithContext(c: Context, message: string, data?: any): string {
+    const { traceparent, xCloudTraceContext } = this.resolveTraceHeadersFromContext(c);
+    return this.logWarn(message, data, traceparent, xCloudTraceContext);
+  }
+
+  logDebugWithContext(c: Context, message: string, data?: any): string {
+    const { traceparent, xCloudTraceContext } = this.resolveTraceHeadersFromContext(c);
+    return this.logDebug(message, data, traceparent, xCloudTraceContext);
+  }
+
+  logErrorWithContext(c: Context, message: string, error?: Error | any): string {
+    const { traceparent, xCloudTraceContext } = this.resolveTraceHeadersFromContext(c);
+    return this.logError(message, error, traceparent, xCloudTraceContext);
   }
 
   /**
    * ログエントリを作成
    */
-  private createLogEntry(level: LogEntry['level'], message: string, data?: any): string {
+  private createLogEntry(
+    level: LogEntry['level'],
+    message: string,
+    data?: any,
+    traceparent?: string,
+    xCloudTraceContext?: string,
+  ): string {
     const logId = randomUUID();
     const timestamp = new Date().toISOString();
 
@@ -151,8 +267,8 @@ export class LoggingService {
       data: data || null,
     };
 
-    // OpenTelemetry spanからtrace情報を追加
-    this.addTraceContext(logEntry);
+    // OpenTelemetry spanまたはHTTPヘッダーからtrace情報を追加
+    this.addTraceContext(logEntry, traceparent, xCloudTraceContext);
 
     // jsonPayloadとして認識されるように1行で出力
     console.log(JSON.stringify(logEntry));

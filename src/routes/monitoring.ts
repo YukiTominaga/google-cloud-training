@@ -1,11 +1,13 @@
 import { Hono } from 'hono';
 import { MonitoringService } from '../services/monitoring.service.js';
 import type { CustomMetricRequest, CustomMetricResponse } from '../types/monitoring.js';
+import { LoggingService } from '../services/logging.service.js';
 
 const monitoring = new Hono();
 
 // MonitoringServiceのインスタンスを作成
 const monitoringService = new MonitoringService();
+const loggingService = new LoggingService();
 
 // Google Cloud Monitoring設定状態を確認するエンドポイント
 monitoring.get('/custom-metrics/config', (c) => {
@@ -82,7 +84,7 @@ monitoring.post('/custom-metrics', async (c) => {
       hint: 'Check Cloud Monitoring Console in 2-3 minutes for the metric data',
     });
   } catch (error: any) {
-    console.error('Error sending custom metric:', error);
+    loggingService.logErrorWithContext(c, 'Error sending custom metric', error);
     return c.json(
       {
         success: false,
@@ -111,7 +113,7 @@ monitoring.post('/custom-metrics/sample', async (c) => {
       hint: 'Check Cloud Monitoring Console in 2-3 minutes for the metric data',
     });
   } catch (error) {
-    console.error('Error sending sample metrics:', error);
+    loggingService.logErrorWithContext(c, 'Error sending sample metrics', error);
     return c.json(
       {
         success: false,
@@ -152,7 +154,7 @@ monitoring.post('/custom-metrics/test', async (c) => {
       consoleUrl: `https://console.cloud.google.com/monitoring/metrics-explorer?project=${configStatus.projectId}`,
     });
   } catch (error: any) {
-    console.error('Error sending test metric:', error);
+    loggingService.logErrorWithContext(c, 'Error sending test metric', error);
     return c.json(
       {
         success: false,

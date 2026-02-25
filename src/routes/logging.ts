@@ -13,11 +13,8 @@ logging.post('/structure', async (c) => {
   try {
     const body = (await c.req.json()) as LogStructureRequest;
 
-    // traceparentヘッダーを取得
-    const traceparent = c.req.header('traceparent');
-
     // 構造化ログとして出力（trace情報付き）
-    loggingService.logStructuredData(body, traceparent);
+    loggingService.logStructuredDataWithContext(c, body);
 
     const response: LogStructureResponse = {
       success: true,
@@ -27,8 +24,7 @@ logging.post('/structure', async (c) => {
     return c.json(response);
   } catch (error) {
     // Error Reporting形式でエラーログ出力
-    const traceparent = c.req.header('traceparent');
-    loggingService.logError('Error processing logging request', error, traceparent);
+    loggingService.logErrorWithContext(c, 'Error processing logging request', error);
 
     const errorResponse: LogStructureResponse = {
       success: false,
@@ -49,19 +45,18 @@ logging.post('/test/:level', async (c) => {
 
     switch (level) {
       case 'info':
-        logId = loggingService.logInfo('Test info log', body);
+        logId = loggingService.logInfoWithContext(c, 'Test info log', body);
         break;
       case 'warn':
-        logId = loggingService.logWarn('Test warning log', body);
+        logId = loggingService.logWarnWithContext(c, 'Test warning log', body);
         break;
       case 'error':
         // Error Reporting形式でログ出力（テスト用のエラーを作成）
         const testError = new Error('Test error occurred');
-        const traceparent = c.req.header('traceparent');
-        logId = loggingService.logError('Test error log', testError, traceparent);
+        logId = loggingService.logErrorWithContext(c, 'Test error log', testError);
         break;
       case 'debug':
-        logId = loggingService.logDebug('Test debug log', body);
+        logId = loggingService.logDebugWithContext(c, 'Test debug log', body);
         break;
       default:
         return c.json({ error: 'Invalid log level. Use: info, warn, error, debug' }, 400);
@@ -73,22 +68,19 @@ logging.post('/test/:level', async (c) => {
     });
   } catch (error) {
     // Error Reporting形式でエラーログ出力
-    const traceparent = c.req.header('traceparent');
-    loggingService.logError('Error in test logging', error, traceparent);
+    loggingService.logErrorWithContext(c, 'Error in test logging', error);
     return c.json({ error: 'Failed to create test log' }, 500);
   }
 });
 
 // エラーシミュレーション用エンドポイント
 logging.get('/error-test', (c) => {
-  const traceparent = c.req.header('traceparent');
-
   try {
     // 意図的にエラーを発生させる
     throw new Error('Simulated application error for Error Reporting test');
   } catch (error) {
-    // Error Reporting形式でログ出力
-    loggingService.logError('Application error occurred', error, traceparent);
+    // Error Reporting形式でログ出力（Context経由でtraceヘッダーを解決）
+    loggingService.logErrorWithContext(c, 'Application error occurred', error);
 
     return c.json(
       {

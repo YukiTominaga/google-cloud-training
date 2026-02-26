@@ -11,8 +11,7 @@ export interface LogStructureResponse {
 
 export interface LogEntry {
   logId: string;
-  timestamp: string;
-  level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG';
+  severity: 'INFO' | 'WARNING' | 'ERROR' | 'DEBUG';
   message: string;
   data: any;
 }

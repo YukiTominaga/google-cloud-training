@@ -1,13 +1,15 @@
 // OpenTelemetryの初期化を最初に実行
 import { startTracing } from './config/tracing.js';
-startTracing();
+await startTracing();
 
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
+import { httpInstrumentationMiddleware } from '@hono/otel';
 import { config, validateConfig } from './config/config.js';
 import logging from './routes/logging.js';
 import monitoring from './routes/monitoring.js';
 import trace from './routes/trace.js';
+import telemetry from './routes/telemetry.js';
 
 // アプリケーション設定の検証
 const configValidation = validateConfig();
@@ -23,6 +25,14 @@ console.log(`- Environment: ${config.nodeEnv}`);
 console.log(`- Port: ${config.port}`);
 
 const app = new Hono();
+
+// otelミドルウェアをアプリケーション全体に適用（HonoのルーティングをSpan名に反映）
+// ヘルスチェックエンドポイントはトレースから除外
+const otelMiddleware = httpInstrumentationMiddleware();
+app.use('*', (c, next) => {
+  if (c.req.path === '/health') return next();
+  return otelMiddleware(c, next);
+});
 
 // 基本ルート
 app.get('/', (c) => {
@@ -53,6 +63,9 @@ app.route('/logging', logging);
 
 // traceルートを統合
 app.route('/trace', trace);
+
+// telemetryルートを統合（Telemetry API OTLP直接送信デモ）
+app.route('/telemetry', telemetry);
 
 serve(
   {

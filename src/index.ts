@@ -10,6 +10,7 @@ import logging from './routes/logging.js';
 import monitoring from './routes/monitoring.js';
 import trace from './routes/trace.js';
 import telemetry from './routes/telemetry.js';
+import dlp from './routes/dlp.js';
 
 // アプリケーション設定の検証
 const configValidation = validateConfig();
@@ -66,6 +67,9 @@ app.route('/trace', trace);
 
 // telemetryルートを統合（Telemetry API OTLP直接送信デモ）
 app.route('/telemetry', telemetry);
+
+// DLP（Data Loss Prevention）ルートを統合
+app.route('/dlp', dlp);
 
 serve(
   {

@@ -1,7 +1,7 @@
 # ==============================================================================
 # Build Stage
 # ==============================================================================
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 
 # セキュリティの向上のため非rootユーザーを作成
 RUN addgroup --system --gid 1001 nodejs
@@ -25,7 +25,7 @@ RUN npm run build
 # ==============================================================================
 # Production Stage
 # ==============================================================================
-FROM node:22-alpine AS production
+FROM node:24-alpine AS production
 
 # セキュリティパッケージのインストール
 RUN apk add --no-cache dumb-init

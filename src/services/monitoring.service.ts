@@ -290,6 +290,96 @@ export class MonitoringService {
   }
 
   /**
+   * ランダム値(1〜100)を一定間隔で指定時間だけ継続的に書き込む
+   * デモ用: 1リクエストだけで時系列データを生成できる
+   *
+   * 即座にバックグラウンド処理を開始し、ジョブ情報を返す（書き込み完了は待たない）
+   *
+   * @param options.metricType - メトリックタイプ（デフォルト: application/demo_random）
+   * @param options.durationMinutes - 書き込みを継続する時間（分、デフォルト: 5）
+   * @param options.intervalSeconds - 書き込み間隔（秒、デフォルト: 10）
+   * @param options.labels - メトリックに付与するラベル
+   */
+  startContinuousRandomMetrics(options: {
+    metricType?: string;
+    durationMinutes?: number;
+    intervalSeconds?: number;
+    labels?: Record<string, string>;
+  } = {}): {
+    metricType: string;
+    durationMinutes: number;
+    intervalSeconds: number;
+    totalWrites: number;
+    labels: Record<string, string>;
+  } {
+    this.checkConfig();
+
+    const metricType = options.metricType || 'application/demo_random';
+    const durationMinutes = options.durationMinutes ?? 5;
+    const intervalSeconds = options.intervalSeconds ?? 10;
+    const labels = options.labels || {
+      environment: process.env.NODE_ENV || 'development',
+      instance: 'hono-server',
+    };
+
+    const intervalMs = intervalSeconds * 1000;
+    const durationMs = durationMinutes * 60 * 1000;
+    const totalWrites = Math.floor(durationMs / intervalMs);
+
+    // ランダム値(1〜100)を生成して書き込むヘルパー
+    const writeOne = async () => {
+      const value = Math.floor(Math.random() * 100) + 1; // 1〜100
+      try {
+        await this.sendCustomMetric({ metricType, value, labels }, false);
+      } catch (error) {
+        console.error('[Monitoring] Continuous metric write failed:', {
+          metricType,
+          value,
+          error: error instanceof Error ? error.message : error,
+        });
+      }
+    };
+
+    // バックグラウンドで継続書き込みを開始
+    (async () => {
+      // 初回はディスクリプタを自動作成しつつ書き込む
+      try {
+        await this.sendCustomMetric(
+          { metricType, value: Math.floor(Math.random() * 100) + 1, labels },
+          true,
+        );
+      } catch (error) {
+        console.error('[Monitoring] Initial continuous metric write failed:', error);
+      }
+
+      const startedAt = Date.now();
+      const timer = setInterval(() => {
+        // 経過時間が指定時間を超えたら停止
+        if (Date.now() - startedAt >= durationMs) {
+          clearInterval(timer);
+          console.log(
+            `✓ Continuous metric writing finished: ${metricType} (${durationMinutes} min)`,
+          );
+          return;
+        }
+        void writeOne();
+      }, intervalMs);
+    })();
+
+    console.log(
+      `▶ Started continuous metric writing: ${metricType} every ${intervalSeconds}s for ${durationMinutes} min (~${totalWrites + 1} points)`,
+    );
+
+    return {
+      metricType,
+      durationMinutes,
+      intervalSeconds,
+      totalWrites: totalWrites + 1, // 初回書き込みを含む
+      labels,
+    };
+  }
+
+  /**
    * 設定状態を取得
    */
   getConfigStatus() {

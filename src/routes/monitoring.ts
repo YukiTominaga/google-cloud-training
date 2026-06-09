@@ -98,6 +98,62 @@ monitoring.post('/custom-metrics', async (c) => {
   }
 });
 
+// ランダム値(1〜100)を継続的に書き込むエンドポイント（デモ用）
+// GETリクエストするだけで、デフォルトで5分間・10秒間隔でランダム値を書き込み続ける
+// ブラウザでアクセスするだけでもOK:
+// http://localhost:3000/monitoring/custom-metrics/continuous
+// 間隔や時間、メトリックタイプを変更する場合（クエリパラメータ）:
+// http://localhost:3000/monitoring/custom-metrics/continuous?metricType=application/demo_random&durationMinutes=5&intervalSeconds=10
+monitoring.get('/custom-metrics/continuous', (c) => {
+  try {
+    // クエリパラメータから取得（無ければデフォルト値で動作する）
+    const metricType = c.req.query('metricType');
+    const durationMinutesRaw = c.req.query('durationMinutes');
+    const intervalSecondsRaw = c.req.query('intervalSeconds');
+
+    const durationMinutes = durationMinutesRaw ? Number(durationMinutesRaw) : undefined;
+    const intervalSeconds = intervalSecondsRaw ? Number(intervalSecondsRaw) : undefined;
+
+    const job = monitoringService.startContinuousRandomMetrics({
+      metricType: metricType || undefined,
+      durationMinutes:
+        durationMinutes !== undefined && !isNaN(durationMinutes) ? durationMinutes : undefined,
+      intervalSeconds:
+        intervalSeconds !== undefined && !isNaN(intervalSeconds) ? intervalSeconds : undefined,
+    });
+
+    const configStatus = monitoringService.getConfigStatus();
+
+    return c.json({
+      success: true,
+      message: `Started writing random metric values (1-100) for ${job.durationMinutes} minutes`,
+      job: {
+        metricType: job.metricType,
+        durationMinutes: job.durationMinutes,
+        intervalSeconds: job.intervalSeconds,
+        estimatedDataPoints: job.totalWrites,
+        labels: job.labels,
+      },
+      metricFullPath: `custom.googleapis.com/${job.metricType}`,
+      projectId: configStatus.projectId,
+      timestamp: new Date().toISOString(),
+      hint: 'Writing continues in the background. Check Cloud Monitoring Console in 2-3 minutes for the time series.',
+      consoleUrl: `https://console.cloud.google.com/monitoring/metrics-explorer?project=${configStatus.projectId}`,
+    });
+  } catch (error: any) {
+    loggingService.logErrorWithContext(c, 'Error starting continuous metrics', error);
+    return c.json(
+      {
+        success: false,
+        message: 'Failed to start continuous metrics',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        details: error?.details || (error instanceof Error ? error.stack : undefined),
+      },
+      500,
+    );
+  }
+});
+
 // サンプル指標を一括送信するエンドポイント
 monitoring.post('/custom-metrics/sample', async (c) => {
   try {
@@ -207,6 +263,7 @@ monitoring.get('/custom-metrics/types', (c) => {
       testEndpoint: 'POST /monitoring/custom-metrics/test',
       endpoint: 'POST /monitoring/custom-metrics',
       sampleEndpoint: 'POST /monitoring/custom-metrics/sample',
+      continuousEndpoint: 'GET /monitoring/custom-metrics/continuous',
       requiredFields: ['metricType', 'value'],
       optionalFields: ['labels', 'description'],
     },
@@ -235,6 +292,18 @@ monitoring.get('/custom-metrics/types', (c) => {
       sampleMetrics: {
         url: 'POST /monitoring/custom-metrics/sample',
         description: 'Send predefined sample metrics (request_count, response_time, memory_usage)',
+      },
+      continuousMetrics: {
+        url: 'GET /monitoring/custom-metrics/continuous',
+        description:
+          'Continuously write random values (1-100) in the background. One GET request keeps writing for 5 minutes by default (10s interval). Just open it in a browser.',
+        query: {
+          metricType: 'application/demo_random',
+          durationMinutes: 5,
+          intervalSeconds: 10,
+        },
+        example:
+          'GET /monitoring/custom-metrics/continuous?metricType=application/demo_random&durationMinutes=5&intervalSeconds=10',
       },
     },
     notes: {

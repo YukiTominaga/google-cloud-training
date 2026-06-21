@@ -1,0 +1,10 @@
+[project]
+name = "adk-agents"
+version = "0.1.0"
+description = "Google ADK (Agent Development Kit) sample agents"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    # 教材の再現性のためバージョンを固定しています (確認済みバージョン)。
+    "google-adk==2.3.0",
+]

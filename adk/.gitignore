@@ -1,0 +1,15 @@
+# uv / Python
+.venv/
+__pycache__/
+*.pyc
+
+# 認証情報・環境変数 (実体はコミットしない)
+.env
+*/.env
+
+# ADK のローカルセッション DB など
+*.db
+
+# Claude Code: ローカル設定は無視しつつ、共有する学習ノートは追跡する
+.claude/*
+!.claude/learnings.md

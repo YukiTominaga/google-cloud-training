@@ -9,13 +9,14 @@ Google ADK (Agent Development Kit) for Python を、写経して動かしなが�
 
 ## 学習順序
 
-| 順  | ディレクトリ                                        | 学べること                                                                             | モジュール  |
-| --- | --------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------- |
-| 1   | [`step_01_basic_agent`](step_01_basic_agent/)                 | 最小の `Agent`（`name`/`model`/`description`/`instruction`/`generate_content_config`） | M2          |
-| 2   | [`step_02_agent_with_tools`](step_02_agent_with_tools/)       | カスタム Function Tool と組み込み `google_search`（`AgentTool` で隔離）                | M2          |
-| 3   | [`step_03_callbacks`](step_03_callbacks/)                     | 6 種コールバック（ロギング / ガードレール / キャッシュ）                               | M2          |
-| 4   | [`step_04_multi_agent`](step_04_multi_agent/)                 | 階層型転送 と Sequential / Parallel / Loop / Custom                                    | M3          |
-| 5   | [`app_research_assistant`](app_research_assistant/) | 統合ミニアプリ（App / Plugin / State / ワークフロー）                                  | M2・M3 総合 |
+| 順  | ディレクトリ                                            | 学べること                                                                                | モジュール   |
+| --- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------ |
+| 1   | [`step_01_basic_agent`](step_01_basic_agent/)           | 最小の `Agent`（`name`/`model`/`description`/`instruction`/`generate_content_config`）    | M2           |
+| 2   | [`step_02_agent_with_tools`](step_02_agent_with_tools/) | カスタム Function Tool と組み込み `google_search`（`AgentTool` で隔離）                   | M2           |
+| 3   | [`step_03_callbacks`](step_03_callbacks/)               | 6 種コールバック（ロギング / ガードレール / キャッシュ）                                  | M2           |
+| 4   | [`step_04_multi_agent`](step_04_multi_agent/)           | 階層型転送 と Sequential / Parallel / Loop / Custom                                       | M3           |
+| 5   | [`app_research_assistant`](app_research_assistant/)     | 統合ミニアプリ（App / Plugin / State / ワークフロー）                                     | M2・M3 総合  |
+| 6   | [`image_edit_studio`](image_edit_studio/)               | 画像編集アプリ（Nano Banana 2 で inpainting / outpainting、artifact・マルチモーダル入力） | 応用（発展） |
 
 ## 前提
 
@@ -88,7 +89,8 @@ adk/
 ├── step_02_agent_with_tools/
 ├── step_03_callbacks/
 ├── step_04_multi_agent/           # agent.py（転送）+ workflows.py（Seq/Par/Loop/Custom）
-└── app_research_assistant/   # 統合ミニアプリ（App パターン）
+├── app_research_assistant/   # 統合ミニアプリ（App パターン）
+└── image_edit_studio/         # 画像編集アプリ（Nano Banana 2 / artifact / 要画像アップロード）
 ```
 
 各ディレクトリの規約: `__init__.py`（`from . import agent`）+ `agent.py`（`root_agent` または

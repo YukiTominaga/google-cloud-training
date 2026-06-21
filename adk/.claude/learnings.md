@@ -2,6 +2,41 @@
 
 ADK 2.3.0 の実体（インストール済みパッケージ / ソース）で検証した、再利用価値のある知見。
 
+## 2026-06-21: adk web のチャット入力はクリップボード画像の貼り付け非対応
+
+バンドルされた adk web フロントエンド（`cli/browser/main-*.js`）の paste/onPaste 処理はテキスト/JSON
+エディタ用のみで、チャット入力欄への画像ペースト（Cmd+V）には非対応。バンドル JS の改変は再インストールで
+消えるため非保守的。**解決策はブラウザ内スニペット**で、adk web 自身のファイル添付フローへ流し込む。
+（参考: 結果画像の取り出しは `InMemoryArtifactService.load_artifact(*, app_name, user_id, filename,
+session_id=None)`。async, keyword 専用。macOS のクリップボード画像は `osascript` の
+`the clipboard as «class PNGf»` でファイル化できる＝追加依存なし。）
+ブラウザ内で Cmd+V を後付けするには、チャットの隠しファイル入力（`<input type=file>` で
+`(change)="fileSelect.emit($event)"` と判明）に、paste 画像を `DataTransfer` 経由で
+`input.files` にセットし `change` を dispatch して adk web 既存の添付フローへ流し込む
+（`image_edit_studio/paste_in_adk_web.user.js`）。Tampermonkey にユーザースクリプトとして入れると
+adk web を開くたび自動で有効化（毎回のコンソール貼り付けが不要）。コンソール貼り付けでも動くが、
+Chrome/Edge は自衛のため初回に `allow pasting` の入力を要求する点に注意。
+**拡張機能なしで恒久化する最善策**: 配信元 `index.html`（`google/adk/cli/browser/index.html`。adk web は
+`/` → `/dev-ui/` リダイレクトで配信）の `</body>` 直前に同じ paste 処理の `<script>` を注入する
+（`image_edit_studio/enable_paste.py`、冪等、`--disable` で除去）。`/dev-ui/` を curl して注入確認済み。
+site-packages を書き換えるため `uv sync --reinstall` 等で消える→再実行が必要。
+
+## 2026-06-21: 画像編集（Nano Banana 2）/ artifact / マルチモーダル入力（image_edit_studio）
+
+- **Nano Banana 2 = `gemini-3-pro-image`**（通称 Nano Banana Pro）。Vertex `utaha-io`/global で利用可能なのは
+  `gemini-3.1-flash-image`（高速・低コスト）, `gemini-3.1-flash-image-preview`, `gemini-3-pro-image`（高品質）。
+  Imagen 系（`edit_image` の `EditMode`/マスク）は一覧に出ず未確認。Nano Banana は「画像＋プロンプト」で in/out-painting する。
+- **画像編集の呼び出し**（`google-genai 2.9.0`）: `client.aio.models.generate_content(model, contents=[image_part, prompt],
+config=types.GenerateContentConfig(response_modalities=["IMAGE"]))`。出力画像は
+  `resp.candidates[0].content.parts[].inline_data.data`（バイト）/`.mime_type`。`.aio` で非同期呼び出し可。
+- **アップロード画像の取得**: `adk web` の添付画像はユーザーメッセージの `inline_data` Part として届き、ツールは
+  `tool_context.user_content.parts` から取得できる（実機相当のプログラム模擬で確認済み）。
+- **artifact**: `tool_context.save_artifact(filename, types.Part.from_bytes(data=, mime_type=))` は **async**（`await` 必須）。
+  `load_artifact` も async。保存した画像は `adk web` の画面に表示される。
+- **レート制限**: 画像モデルはクォータが小さく、連続実行で `429 RESOURCE_EXHAUSTED` になりやすい。検証では元画像を
+  `/tmp` にキャッシュして再生成を避け、バックオフ再試行した。
+- **テスト用画像の注意**: 1x1 PNG は API に "Failed to decode image data" で弾かれる。zlib で 64x64 以上の有効な PNG を作る。
+
 ## 2026-06-21: エージェントのディレクトリ名は英字始まりにする（数字始まりは実行時に落ちる）
 
 **重要な落とし穴。** `01_basic_agent` のような数字始まりディレクトリは `AgentLoader`（`verify_agents.py`

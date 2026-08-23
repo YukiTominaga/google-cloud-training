@@ -1,0 +1,10 @@
+# uv / Python
+.venv/
+__pycache__/
+*.pyc
+
+# 認証情報・環境変数 (実体はコミットしない)
+.env
+
+# Jupyter
+.ipynb_checkpoints/

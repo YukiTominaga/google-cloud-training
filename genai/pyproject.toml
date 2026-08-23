@@ -1,0 +1,16 @@
+[project]
+name = "genai-demo"
+version = "0.1.0"
+description = "google-genai SDK demo notebooks (Vertex AI / ADC)"
+requires-python = ">=3.13"
+dependencies = [
+    "google-genai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "ipykernel>=6.29.0",
+    "jupyterlab>=4.0.0",
+    "pillow>=12.3.0",
+    "google-cloud-aiplatform[evaluation]>=1.111.0",
+    "pandas>=2.0.0",
+    "scikit-learn>=1.3.0",
+    "matplotlib>=3.8.0",
+]

@@ -8,10 +8,3 @@ export interface LogStructureResponse {
   success: boolean;
   message: string;
 }
-
-export interface LogEntry {
-  logId: string;
-  severity: 'INFO' | 'WARNING' | 'ERROR' | 'DEBUG';
-  message: string;
-  data: any;
-}

@@ -1,13 +1,11 @@
-import { MetricServiceClient } from '@google-cloud/monitoring';
+import { metrics } from '@opentelemetry/api';
+import type { Gauge } from '@opentelemetry/api';
 import { config, validateConfig } from '../config/config.js';
-import type {
-  CustomMetricRequest,
-  MetricDescriptor,
-  MonitoredResource,
-} from '../types/monitoring.js';
+import type { CustomMetricRequest } from '../types/monitoring.js';
 
 export class MonitoringService {
-  private client: MetricServiceClient;
+  private meter = metrics.getMeter('monitoring-service');
+  private gauges = new Map<string, Gauge>();
   private projectId: string;
   private isConfigValid: boolean;
 
@@ -19,10 +17,6 @@ export class MonitoringService {
       console.warn('Google Cloud Monitoring configuration errors:', configValidation.errors);
     }
 
-    // Application Default Credentials を使用
-    // gcloud auth application-default login を実行するか、
-    // GCE/GKE環境でサービスアカウントが自動設定される
-    this.client = new MetricServiceClient();
     this.projectId = config.projectId;
   }
 
@@ -50,183 +44,43 @@ export class MonitoringService {
   }
 
   /**
-   * モニタリングリソースを取得
+   * metricType に対応する Gauge instrument を取得（なければ作成してキャッシュ）
    */
-  private getMonitoredResource(): MonitoredResource {
-    return {
-      type: 'generic_task',
-      labels: {
-        project_id: this.projectId,
-        location: 'global',
-        namespace: 'hono-app',
-        job: 'custom-metrics',
-        task_id: process.env.HOSTNAME || 'local-instance',
-      },
-    };
+  private getGauge(metricType: string, description?: string): Gauge {
+    let gauge = this.gauges.get(metricType);
+    if (!gauge) {
+      gauge = this.meter.createGauge(metricType, {
+        description: description || `Custom metric: ${metricType}`,
+      });
+      this.gauges.set(metricType, gauge);
+    }
+    return gauge;
   }
 
   /**
-   * カスタム指標の定義を作成
+   * カスタム指標を記録
+   * gauge.record() は同期・即時実行で、実際のネットワーク送信は
+   * NodeSDK 側の PeriodicExportingMetricReader がバックグラウンドで定期的に行う
+   * @param metric - 記録するメトリックデータ
    */
-  async createMetricDescriptor(descriptor: MetricDescriptor): Promise<void> {
-    this.checkConfig();
-
-    const projectName = this.client.projectPath(this.projectId);
-
-    const request = {
-      name: projectName,
-      metricDescriptor: {
-        type: `custom.googleapis.com/${descriptor.type}`,
-        metricKind: descriptor.metricKind,
-        valueType: descriptor.valueType,
-        description: descriptor.description,
-        displayName: descriptor.displayName,
-        labels: descriptor.labels || [],
-      },
-    };
-
-    if (config.enableDebugLogging) {
-      console.log('[Monitoring] Creating metric descriptor:', JSON.stringify(request, null, 2));
-    }
-
-    try {
-      const [result] = await this.client.createMetricDescriptor(request);
-      console.log(`✓ Created metric descriptor: ${result.name}`);
-    } catch (error) {
-      // 既に存在する場合はエラーをログに出力するが処理は継続
-      if (error instanceof Error && error.message.includes('already exists')) {
-        console.log(`ℹ Metric descriptor already exists: ${descriptor.type}`);
-      } else {
-        console.error('[Monitoring Error] Failed to create metric descriptor:', {
-          metricType: descriptor.type,
-          error: error instanceof Error ? error.message : error,
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-        throw error;
-      }
-    }
-  }
-
-  /**
-   * カスタム指標を送信
-   * @param metric - 送信するメトリックデータ
-   * @param autoCreateDescriptor - メトリックディスクリプタが存在しない場合に自動作成するか（デフォルト: false）
-   */
-  async sendCustomMetric(
-    metric: CustomMetricRequest,
-    autoCreateDescriptor: boolean = false,
-  ): Promise<void> {
+  sendCustomMetric(metric: CustomMetricRequest): void {
     this.checkConfig();
     this.validateMetric(metric);
 
-    // 自動作成が有効な場合、メトリックディスクリプタを作成を試みる
-    if (autoCreateDescriptor) {
-      try {
-        await this.createMetricDescriptor({
-          type: metric.metricType,
-          metricKind: 'GAUGE',
-          valueType: 'DOUBLE',
-          description: metric.description || `Custom metric: ${metric.metricType}`,
-          displayName: metric.metricType.split('/').pop() || metric.metricType,
-          labels: metric.labels
-            ? Object.keys(metric.labels).map((key) => ({
-                key,
-                valueType: 'STRING' as const,
-                description: `Label: ${key}`,
-              }))
-            : [],
-        });
-      } catch (error) {
-        // エラーは無視（既に存在する場合など）
-        if (config.enableDebugLogging) {
-          console.log('[Monitoring] Metric descriptor creation skipped:', error);
-        }
-      }
-    }
-
-    const projectName = this.client.projectPath(this.projectId);
-
-    // タイムスタンプを作成
-    const now = new Date();
-    const seconds = Math.floor(now.getTime() / 1000);
-    const nanos = (now.getTime() % 1000) * 1000000;
-
-    // GAUGEメトリックの場合はstartTimeとendTimeを同じにする
-    const timeInterval = {
-      endTime: {
-        seconds: seconds,
-        nanos: nanos,
-      },
-      startTime: {
-        seconds: seconds,
-        nanos: nanos,
-      },
-    };
-
-    const monitoredResource = this.getMonitoredResource();
-
-    const request = {
-      name: projectName,
-      timeSeries: [
-        {
-          metric: {
-            type: `custom.googleapis.com/${metric.metricType}`,
-            labels: metric.labels || {},
-          },
-          resource: monitoredResource,
-          points: [
-            {
-              interval: timeInterval,
-              value: {
-                doubleValue: metric.value,
-              },
-            },
-          ],
-        },
-      ],
-    };
+    const gauge = this.getGauge(metric.metricType, metric.description);
+    gauge.record(metric.value, metric.labels ?? {});
 
     if (config.enableDebugLogging) {
-      console.log('[Monitoring] Sending metric:', JSON.stringify(request, null, 2));
+      console.log('[Monitoring] Recording metric:', JSON.stringify(metric, null, 2));
     }
 
-    try {
-      await this.client.createTimeSeries(request);
-      console.log(`✓ Metric sent successfully: ${metric.metricType} = ${metric.value}`);
-    } catch (error: any) {
-      // より詳細なエラー情報を抽出
-      const errorDetails = {
-        metricType: metric.metricType,
-        value: metric.value,
-        labels: metric.labels,
-        message: error instanceof Error ? error.message : String(error),
-        code: error?.code,
-        details: error?.details,
-        metadata: error?.metadata,
-      };
-
-      console.error('[Monitoring Error] Failed to send metric:', errorDetails);
-
-      // より分かりやすいエラーメッセージを生成
-      let userFriendlyMessage = error instanceof Error ? error.message : String(error);
-
-      if (error?.message?.includes('not exist')) {
-        userFriendlyMessage = `Metric descriptor for "${metric.metricType}" does not exist. Create it first using createMetricDescriptor().`;
-      } else if (error?.message?.includes('TimeSeries could not be written')) {
-        userFriendlyMessage = `Failed to write metric "${metric.metricType}". This may be due to: 1) Missing metric descriptor, 2) Invalid labels, 3) Invalid resource type. Original error: ${error.message}`;
-      }
-
-      const enhancedError = new Error(userFriendlyMessage);
-      (enhancedError as any).originalError = error;
-      (enhancedError as any).details = errorDetails;
-      throw enhancedError;
-    }
+    console.log(`✓ Metric recorded: ${metric.metricType} = ${metric.value}`);
   }
 
   /**
    * サンプル指標を送信するヘルパーメソッド
    */
-  async sendSampleMetrics(): Promise<Array<{ metricType: string; value: number }>> {
+  sendSampleMetrics(): Array<{ metricType: string; value: number }> {
     const sampleMetrics = [
       {
         metricType: 'application/request_count',
@@ -245,36 +99,13 @@ export class MonitoringService {
       },
     ];
 
-    // 指標定義を作成（初回のみ）
-    // ラベルを定義に含める
-    for (const metric of sampleMetrics) {
-      await this.createMetricDescriptor({
-        type: metric.metricType,
-        metricKind: 'GAUGE',
-        valueType: 'DOUBLE',
-        description: metric.description,
-        displayName: metric.metricType.replace('application/', '').replace(/_/g, ' '),
-        labels: [
-          {
-            key: 'environment',
-            valueType: 'STRING',
-            description: 'Environment name (development, production, etc.)',
-          },
-          {
-            key: 'instance',
-            valueType: 'STRING',
-            description: 'Instance identifier',
-          },
-        ],
-      });
-    }
-
-    // 指標を送信
+    // 指標を記録
     const results = [];
     for (const metric of sampleMetrics) {
-      await this.sendCustomMetric({
+      this.sendCustomMetric({
         metricType: metric.metricType,
         value: metric.value,
+        description: metric.description,
         labels: {
           environment: process.env.NODE_ENV || 'development',
           instance: 'hono-server',
@@ -293,7 +124,7 @@ export class MonitoringService {
    * ランダム値(1〜100)を一定間隔で指定時間だけ継続的に書き込む
    * デモ用: 1リクエストだけで時系列データを生成できる
    *
-   * 即座にバックグラウンド処理を開始し、ジョブ情報を返す（書き込み完了は待たない）
+   * 即座に初回の書き込みを行い、ジョブ情報を返す（以降は setInterval で継続書き込み）
    *
    * @param options.metricType - メトリックタイプ（デフォルト: application/demo_random）
    * @param options.durationMinutes - 書き込みを継続する時間（分、デフォルト: 5）
@@ -327,10 +158,10 @@ export class MonitoringService {
     const totalWrites = Math.floor(durationMs / intervalMs);
 
     // ランダム値(1〜100)を生成して書き込むヘルパー
-    const writeOne = async () => {
+    const writeOne = () => {
       const value = Math.floor(Math.random() * 100) + 1; // 1〜100
       try {
-        await this.sendCustomMetric({ metricType, value, labels }, false);
+        this.sendCustomMetric({ metricType, value, labels });
       } catch (error) {
         console.error('[Monitoring] Continuous metric write failed:', {
           metricType,
@@ -340,31 +171,26 @@ export class MonitoringService {
       }
     };
 
-    // バックグラウンドで継続書き込みを開始
-    (async () => {
-      // 初回はディスクリプタを自動作成しつつ書き込む
-      try {
-        await this.sendCustomMetric(
-          { metricType, value: Math.floor(Math.random() * 100) + 1, labels },
-          true,
-        );
-      } catch (error) {
-        console.error('[Monitoring] Initial continuous metric write failed:', error);
-      }
+    // 初回の書き込み
+    try {
+      this.sendCustomMetric({ metricType, value: Math.floor(Math.random() * 100) + 1, labels });
+    } catch (error) {
+      console.error('[Monitoring] Initial continuous metric write failed:', error);
+    }
 
-      const startedAt = Date.now();
-      const timer = setInterval(() => {
-        // 経過時間が指定時間を超えたら停止
-        if (Date.now() - startedAt >= durationMs) {
-          clearInterval(timer);
-          console.log(
-            `✓ Continuous metric writing finished: ${metricType} (${durationMinutes} min)`,
-          );
-          return;
-        }
-        void writeOne();
-      }, intervalMs);
-    })();
+    // 継続書き込みを開始
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      // 経過時間が指定時間を超えたら停止
+      if (Date.now() - startedAt >= durationMs) {
+        clearInterval(timer);
+        console.log(
+          `✓ Continuous metric writing finished: ${metricType} (${durationMinutes} min)`,
+        );
+        return;
+      }
+      writeOne();
+    }, intervalMs);
 
     console.log(
       `▶ Started continuous metric writing: ${metricType} every ${intervalSeconds}s for ${durationMinutes} min (~${totalWrites + 1} points)`,
@@ -388,8 +214,8 @@ export class MonitoringService {
       isValid: this.isConfigValid,
       projectId: this.projectId,
       enableDebugLogging: config.enableDebugLogging,
-      authMethod: 'Application Default Credentials (ADC)',
-      monitoredResourceType: 'generic_task',
+      authMethod: 'Application Default Credentials (ADC) via OpenTelemetry OTLP Exporter',
+      exportPath: 'OpenTelemetry Metrics SDK -> Google Cloud Telemetry API (OTLP)',
       errors: validation.errors,
     };
   }

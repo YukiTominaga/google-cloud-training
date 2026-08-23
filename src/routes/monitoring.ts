@@ -24,8 +24,6 @@ monitoring.get('/custom-metrics/config', (c) => {
 
 // Google Cloud Monitoringにカスタム指標を送信するエンドポイント
 // curl -X POST http://localhost:3000/monitoring/custom-metrics -H "Content-Type: application/json" -d '{"metricType": "application/test", "value": 42, "labels": {"environment": "training"}}'
-// autoCreateDescriptor=trueを指定すると、メトリックディスクリプタを自動作成します
-// curl -X POST 'http://localhost:3000/monitoring/custom-metrics?autoCreate=true' -H "Content-Type: application/json" -d '{"metricType": "application/test", "value": 42, "labels": {"environment": "training"}}'
 monitoring.post('/custom-metrics', async (c) => {
   try {
     const body = (await c.req.json()) as any;
@@ -62,11 +60,8 @@ monitoring.post('/custom-metrics', async (c) => {
       description: body.description,
     };
 
-    // autoCreateパラメータのチェック
-    const autoCreate = c.req.query('autoCreate') === 'true';
-
     // カスタム指標を送信
-    await monitoringService.sendCustomMetric(metricRequest, autoCreate);
+    monitoringService.sendCustomMetric(metricRequest);
 
     const configStatus = monitoringService.getConfigStatus();
     const response: CustomMetricResponse = {
@@ -78,20 +73,20 @@ monitoring.post('/custom-metrics', async (c) => {
 
     return c.json({
       ...response,
-      metricFullPath: `custom.googleapis.com/${metricRequest.metricType}`,
+      metricNote:
+        'OTLP経由でCloud Monitoringに取り込まれます（正確なメトリクス名はMetrics Explorerで確認してください）',
       projectId: configStatus.projectId,
       labels: metricRequest.labels,
       hint: 'Check Cloud Monitoring Console in 2-3 minutes for the metric data',
     });
   } catch (error: any) {
-    loggingService.logErrorWithContext(c, 'Error sending custom metric', error);
+    loggingService.logError('Error sending custom metric', error);
     return c.json(
       {
         success: false,
         message: 'Failed to send custom metric',
         error: error instanceof Error ? error.message : 'Unknown error',
         details: error?.details || (error instanceof Error ? error.stack : undefined),
-        hint: 'Try adding ?autoCreate=true to automatically create the metric descriptor',
       },
       500,
     );
@@ -134,14 +129,15 @@ monitoring.get('/custom-metrics/continuous', (c) => {
         estimatedDataPoints: job.totalWrites,
         labels: job.labels,
       },
-      metricFullPath: `custom.googleapis.com/${job.metricType}`,
+      metricNote:
+        'OTLP経由でCloud Monitoringに取り込まれます（正確なメトリクス名はMetrics Explorerで確認してください）',
       projectId: configStatus.projectId,
       timestamp: new Date().toISOString(),
       hint: 'Writing continues in the background. Check Cloud Monitoring Console in 2-3 minutes for the time series.',
       consoleUrl: `https://console.cloud.google.com/monitoring/metrics-explorer?project=${configStatus.projectId}`,
     });
   } catch (error: any) {
-    loggingService.logErrorWithContext(c, 'Error starting continuous metrics', error);
+    loggingService.logError('Error starting continuous metrics', error);
     return c.json(
       {
         success: false,
@@ -157,7 +153,7 @@ monitoring.get('/custom-metrics/continuous', (c) => {
 // サンプル指標を一括送信するエンドポイント
 monitoring.post('/custom-metrics/sample', async (c) => {
   try {
-    const results = await monitoringService.sendSampleMetrics();
+    const results = monitoringService.sendSampleMetrics();
     const configStatus = monitoringService.getConfigStatus();
 
     return c.json({
@@ -169,7 +165,7 @@ monitoring.post('/custom-metrics/sample', async (c) => {
       hint: 'Check Cloud Monitoring Console in 2-3 minutes for the metric data',
     });
   } catch (error) {
-    loggingService.logErrorWithContext(c, 'Error sending sample metrics', error);
+    loggingService.logError('Error sending sample metrics', error);
     return c.json(
       {
         success: false,
@@ -183,7 +179,6 @@ monitoring.post('/custom-metrics/sample', async (c) => {
 });
 
 // テスト用の単一メトリック送信エンドポイント
-// デフォルトでautoCreate=trueで実行
 monitoring.post('/custom-metrics/test', async (c) => {
   try {
     const testMetric = {
@@ -195,8 +190,7 @@ monitoring.post('/custom-metrics/test', async (c) => {
       },
     };
 
-    // テストエンドポイントではデフォルトで自動作成を有効化
-    await monitoringService.sendCustomMetric(testMetric, true);
+    monitoringService.sendCustomMetric(testMetric);
     const configStatus = monitoringService.getConfigStatus();
 
     return c.json({
@@ -204,13 +198,12 @@ monitoring.post('/custom-metrics/test', async (c) => {
       message: 'Test metric sent successfully',
       metric: testMetric,
       projectId: configStatus.projectId,
-      metricFullPath: `custom.googleapis.com/${testMetric.metricType}`,
       timestamp: new Date().toISOString(),
       hint: 'Check Cloud Monitoring Console in 2-3 minutes for the metric data',
       consoleUrl: `https://console.cloud.google.com/monitoring/metrics-explorer?project=${configStatus.projectId}`,
     });
   } catch (error: any) {
-    loggingService.logErrorWithContext(c, 'Error sending test metric', error);
+    loggingService.logError('Error sending test metric', error);
     return c.json(
       {
         success: false,
@@ -270,7 +263,7 @@ monitoring.get('/custom-metrics/types', (c) => {
     examples: {
       testMetric: {
         url: 'POST /monitoring/custom-metrics/test',
-        description: 'Send a test metric to verify the setup (auto-creates descriptor)',
+        description: 'Send a test metric to verify the setup',
       },
       singleMetric: {
         url: 'POST /monitoring/custom-metrics',
@@ -278,15 +271,6 @@ monitoring.get('/custom-metrics/types', (c) => {
           metricType: 'application/request_count',
           value: 42,
           labels: { environment: 'production', region: 'asia-northeast1' },
-        },
-      },
-      singleMetricAutoCreate: {
-        url: 'POST /monitoring/custom-metrics?autoCreate=true',
-        description: 'Automatically create metric descriptor if it does not exist',
-        body: {
-          metricType: 'application/new_metric',
-          value: 100,
-          labels: { environment: 'development' },
         },
       },
       sampleMetrics: {
@@ -309,7 +293,8 @@ monitoring.get('/custom-metrics/types', (c) => {
     notes: {
       labels:
         'Labels must be nested under "labels" field, or will be auto-detected from top-level string fields',
-      autoCreate: 'Add ?autoCreate=true query parameter to automatically create metric descriptors',
+      ingestion:
+        'メトリクスはOpenTelemetryのGauge instrumentとして記録され、Telemetry API (OTLP) 経由で約10秒間隔でCloud Monitoringにエクスポートされます。メトリックディスクリプタの手動作成は不要です',
       errorHandling: 'Detailed error information is returned in the response',
     },
   });

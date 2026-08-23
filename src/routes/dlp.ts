@@ -76,7 +76,7 @@ dlp.post('/', async (c) => {
 
     return c.json(response);
   } catch (error) {
-    loggingService.logErrorWithContext(c, 'Error masking image with DLP', error);
+    loggingService.logError('Error masking image with DLP', error);
 
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const isClientError =

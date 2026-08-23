@@ -2,7 +2,7 @@
  * Telemetry API ルート
  *
  * Google Cloud Telemetry API (OTLP) へ直接トレースを送信するデモエンドポイント群。
- * src/config/tracing.ts で初期化された NodeSDK が
+ * src/config/otel.ts で初期化された NodeSDK が
  * https://telemetry.googleapis.com/v1/traces へ OTLP/HTTP でエクスポートする。
  *
  * 参考: https://cloud.google.com/stackdriver/docs/instrumentation/migrate-to-otlp-endpoints
@@ -33,15 +33,15 @@ telemetry.get('/basic', async (c) => {
 
   try {
     return await context.with(trace.setSpan(context.active(), span), async () => {
-      // span がアクティブなので logInfoWithContext のログには同じ traceId が付与される
-      loggingService.logInfoWithContext(c, 'telemetry.basic: request received');
+      // span がアクティブなので logInfo のログには同じ traceId が自動的に付与される
+      loggingService.logInfo('telemetry.basic: request received');
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       span.setAttribute('processing.result', 'success');
       span.setStatus({ code: SpanStatusCode.OK });
 
-      loggingService.logInfoWithContext(c, 'telemetry.basic: completed');
+      loggingService.logInfo('telemetry.basic: completed');
 
       return c.json({
         success: true,
@@ -82,7 +82,7 @@ telemetry.get('/attributes', async (c) => {
 
   return await context.with(trace.setSpan(context.active(), span), async () => {
     try {
-      loggingService.logInfoWithContext(c, 'telemetry.attributes: processing started');
+      loggingService.logInfo('telemetry.attributes: processing started');
 
       span.addEvent('processing.started', {
         'event.phase': 'start',
@@ -104,7 +104,7 @@ telemetry.get('/attributes', async (c) => {
       span.addEvent('processing.completed', { 'event.phase': 'end' });
       span.setStatus({ code: SpanStatusCode.OK });
 
-      loggingService.logInfoWithContext(c, 'telemetry.attributes: completed', {
+      loggingService.logInfo('telemetry.attributes: completed', {
         responseItems: 3,
       });
 
@@ -150,7 +150,7 @@ telemetry.get('/nested', async (c) => {
 
   return await context.with(trace.setSpan(context.active(), parentSpan), async () => {
     try {
-      loggingService.logInfoWithContext(c, 'telemetry.nested: parent span started');
+      loggingService.logInfo('telemetry.nested: parent span started');
       parentSpan.addEvent('parent.started');
 
       // 子 span 1: データ取得
@@ -159,11 +159,11 @@ telemetry.get('/nested', async (c) => {
         attributes: { 'operation.level': 'child', 'db.operation': 'SELECT' },
       });
       await context.with(trace.setSpan(context.active(), child1), async () => {
-        loggingService.logInfoWithContext(c, 'telemetry.nested.fetch: started');
+        loggingService.logInfo('telemetry.nested.fetch: started');
         await new Promise((resolve) => setTimeout(resolve, 40));
         child1.setAttribute('db.rows_returned', 100);
         child1.setStatus({ code: SpanStatusCode.OK });
-        loggingService.logInfoWithContext(c, 'telemetry.nested.fetch: completed', {
+        loggingService.logInfo('telemetry.nested.fetch: completed', {
           rowsReturned: 100,
         });
         child1.end();
@@ -175,11 +175,11 @@ telemetry.get('/nested', async (c) => {
         attributes: { 'operation.level': 'child', 'transform.input_rows': 100 },
       });
       await context.with(trace.setSpan(context.active(), child2), async () => {
-        loggingService.logInfoWithContext(c, 'telemetry.nested.transform: started');
+        loggingService.logInfo('telemetry.nested.transform: started');
         await new Promise((resolve) => setTimeout(resolve, 60));
         child2.setAttribute('transform.output_rows', 95);
         child2.setStatus({ code: SpanStatusCode.OK });
-        loggingService.logInfoWithContext(c, 'telemetry.nested.transform: completed', {
+        loggingService.logInfo('telemetry.nested.transform: completed', {
           outputRows: 95,
         });
         child2.end();
@@ -191,17 +191,17 @@ telemetry.get('/nested', async (c) => {
         attributes: { 'operation.level': 'child', 'serialize.format': 'json' },
       });
       await context.with(trace.setSpan(context.active(), child3), async () => {
-        loggingService.logInfoWithContext(c, 'telemetry.nested.serialize: started');
+        loggingService.logInfo('telemetry.nested.serialize: started');
         await new Promise((resolve) => setTimeout(resolve, 20));
         child3.setStatus({ code: SpanStatusCode.OK });
-        loggingService.logInfoWithContext(c, 'telemetry.nested.serialize: completed');
+        loggingService.logInfo('telemetry.nested.serialize: completed');
         child3.end();
       });
 
       parentSpan.setAttribute('operation.children', 3);
       parentSpan.addEvent('parent.completed');
       parentSpan.setStatus({ code: SpanStatusCode.OK });
-      loggingService.logInfoWithContext(c, 'telemetry.nested: all child spans completed');
+      loggingService.logInfo('telemetry.nested: all child spans completed');
 
       return c.json({
         success: true,
@@ -240,7 +240,7 @@ telemetry.get('/error', async (c) => {
 
   return await context.with(trace.setSpan(context.active(), span), async () => {
     try {
-      loggingService.logInfoWithContext(c, 'telemetry.error: operation started');
+      loggingService.logInfo('telemetry.error: operation started');
       span.addEvent('operation.started');
       await new Promise((resolve) => setTimeout(resolve, 30));
 
@@ -253,7 +253,7 @@ telemetry.get('/error', async (c) => {
       });
 
       // エラーログも同じ traceId で Cloud Logging に出力される
-      loggingService.logErrorWithContext(c, 'telemetry.error: operation failed', error);
+      loggingService.logError('telemetry.error: operation failed', error);
 
       return c.json(
         {
@@ -280,7 +280,11 @@ telemetry.get('/info', (c) => {
   return c.json({
     description: 'Google Cloud Telemetry API (OTLP) demo endpoints',
     exportConfig: {
-      endpoint: 'https://telemetry.googleapis.com/v1/traces',
+      endpoints: {
+        traces: 'https://telemetry.googleapis.com/v1/traces',
+        metrics: 'https://telemetry.googleapis.com/v1/metrics',
+        logs: 'https://telemetry.googleapis.com/v1/logs',
+      },
       protocol: 'OTLP/HTTP (protobuf)',
       authentication: 'Application Default Credentials (ADC)',
       propagators: ['W3C TraceContext (traceparent)', 'Google Cloud Trace (X-Cloud-Trace-Context)'],

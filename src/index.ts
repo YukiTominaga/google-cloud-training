@@ -1,6 +1,6 @@
 // OpenTelemetryの初期化を最初に実行
-import { startTracing } from './config/tracing.js';
-await startTracing();
+import { startOpenTelemetry } from './config/otel.js';
+await startOpenTelemetry();
 
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';

@@ -1,0 +1,8 @@
+{
+  "display_name": "Support Coordinator",
+  "description": "Retail customer support coordinator.",
+  "min_instances": 1,
+  "max_instances": 10,
+  "resource_limits": {"cpu": "4", "memory": "8Gi"},
+  "env_vars": {"SUPPORT_ENV": "production"}
+}

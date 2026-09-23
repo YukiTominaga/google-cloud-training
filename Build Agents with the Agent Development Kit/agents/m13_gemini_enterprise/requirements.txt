@@ -1,0 +1,5 @@
+# Agent Runtime 上でインストールされる依存パッケージ
+# （adk deploy agent_engine は agent フォルダの requirements.txt を自動で使う）
+google-adk==2.9.2
+google-cloud-aiplatform[agent_engines,adk]
+pydantic

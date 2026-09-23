@@ -1,0 +1,27 @@
+[project]
+name = "build-agents-with-the-agent-development-kit"
+version = "0.1.0"
+description = "Build Agents with the ADK 講師ガイド（M1〜M13）のサンプルコード"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "google-adk[gcp,mcp]==2.9.2",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.8",
+]
+
+# フォーマット修正：uv run ruff format . && uv run ruff check --fix .
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# ruff 0.16 の既定ルールは範囲が広く --fix がコードの書き方まで変えるため、
+# 従来の既定（E4/E7/E9/F）＋ import の並び替え（I）に絞る
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# adk web が agent を見つけるための `from . import agent` は消させない
+"agents/*/__init__.py" = ["F401"]

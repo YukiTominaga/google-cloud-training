@@ -1,0 +1,10 @@
+# uv / Python
+.venv/
+__pycache__/
+*.pyc
+
+# API キーなどの秘密情報
+.env
+
+# adk web のローカルセッション DB
+.adk/

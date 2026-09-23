@@ -22,6 +22,22 @@
 #   製品名は「Vertex AI …」から「… on Gemini Enterprise Agent Platform」に
 #   改称されたが、クラス名（VertexAiSessionService など）とリソース種別
 #   （reasoningEngine）は旧名のまま。コードが古いわけではない。
+#
+# ■ 試すプロンプト（adk web / adk run で入力）
+#   ※ adk web の既定の memory は InMemoryMemoryService（プロセス内・キーワード一致）。
+#     adk web を再起動すると記憶は消える。Memory Bank で試すには run_commands.sh の
+#     --memory_service_uri か、runners.py の platform モード（AGENT_ENGINE_ID が必要）を使う。
+#   1. 「私のアカウント ID は A-1001 です。覚えておいてください。」
+#      → 最初に load_memory が呼ばれる（まだ何も見つからない）。実行後に
+#        after_agent_callback がこの session を memory に保存する
+#   2. （New Session で新しいセッションにしてから）「私の残高はいくらですか？」
+#      → load_memory が前のセッションの A-1001 を見つけ、lookup_account が呼ばれる
+#        （runners.py のデモと同じ流れ）
+#   3. 「A-1001 の請求書を見せて」
+#      → lookup_account → list_invoices の順に呼ばれる
+#   4. 「注文 O-5002 はいつ届きますか？」
+#      → O-5002 は配達済みのため get_delivery_estimate が "error" を返す。
+#        到着予定日をでっち上げないかを見る
 # =====================================================================
 
 import os

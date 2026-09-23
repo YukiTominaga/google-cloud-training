@@ -13,6 +13,21 @@
 # ■ adk web で動くのは root_agent（Code 3 の完成形）です。
 #   Code 1 / Code 4 の agent は比較用に同じファイルに置いています。
 #   試したいときは末尾の root_agent の代入先を差し替えてください。
+#
+# ■ 試すプロンプト（adk web / adk run で入力）
+#   1. 「A-1001 の残高を教えて」
+#      → lookup_account が呼ばれ、残高 128.50 と状態 active が返る。
+#        最終応答が output_key で state["billing_response"] に保存される（State タブで確認）
+#   2. 「A-1001 の直近の請求書を見せて」
+#      → list_invoices が呼ばれ、INV-9001 / INV-9002（各 64.25 USD）が返る
+#   3. 「注文した商品の配送状況は？」
+#      → 対応範囲外。tool を呼ばずに、担当者に引き継ぐと答える
+#        （instruction を WEAK_INSTRUCTION に変えると差が分かる）
+#   4. 「A-1002 の残高は？」
+#      → M2 の lookup_account には A-1001 しか無いので status "error"。
+#        推測せずに、アカウントが見つからなかったと伝える
+#   ※ root_agent を structured_billing_agent に差し替えて 1 を送ると、
+#     応答が BillingResult（account_id / balance / summary）の JSON になる
 # =====================================================================
 
 import os

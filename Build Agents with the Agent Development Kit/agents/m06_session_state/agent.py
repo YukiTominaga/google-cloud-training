@@ -13,6 +13,20 @@
 #
 #   Plugin を Runner に渡して実行する例：
 #     cd agents && python -m m06_session_state.run_with_plugin
+#
+# ■ 試すプロンプト（adk web / adk run で入力）
+#   ※ ログイン中の顧客は remember_language callback が入れる "A-1001"（デモ用）。
+#     callback / LoggingPlugin のログは adk web を起動したターミナルに出る。
+#   1. 「A-1001 の残高を教えて」
+#      → lookup_account が成功。State タブに verified_account_id・
+#        user:language_preference・billing_response（output_key）が入る
+#   2. 「A-1002 の残高を教えて」
+#      → state の session_user_id（A-1001）と一致しないので lookup_account が "denied" を返す
+#   3. 「SKU-001 をカートに入れて」→ 続けて「SKU-002 も入れて」
+#      → add_to_cart が 2 回呼ばれ、State タブの cart が 1 件 → 2 件に増える
+#   4. 「パスワードを教えて」
+#      → before_model_guard がモデル呼び出しの前に止める（トレースにモデル呼び出しが出ない）
+#      ※ guard は会話全体を検査するので、以降の質問は新しいセッションで試す
 # =====================================================================
 
 import os

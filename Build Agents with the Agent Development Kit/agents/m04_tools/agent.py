@@ -17,6 +17,20 @@
 #   各ルールの ❌ / ✅ 対比は tool_design_rules.py、
 #   「関数が schema になる」様子は show_schema.py で確認できます。
 #     cd agents && python -m m04_tools.show_schema
+#
+# ■ 試すプロンプト（adk web / adk run で入力）
+#   1. 「A-1001 の残高を教えて」
+#      → lookup_account だけが呼ばれ、残高 128.50 と状態 active が返る
+#   2. 「A-1001 の直近の請求書を見せて」
+#      → lookup_account → list_invoices の順に呼ばれる（ルール 5）。
+#        INV-9002（2026-09-01）、INV-9001（2026-08-01）の新しい順、各 64.25 USD
+#   3. 「A-1001 の最新の請求書を 1 件だけ教えて」
+#      → list_invoices に任意引数 limit=1 が渡され、INV-9002 だけが返るか確認する
+#   4. 「A-1002 の請求書は？」
+#      → lookup_account は success（状態 suspended）、list_invoices は success で空リスト。
+#        「エラー」ではなく「請求書の記録が無い」と伝えるか確認する
+#   5. 「A-9999 の請求書は？」
+#      → lookup_account が status "error" を返し、list_invoices は呼ばれない
 # =====================================================================
 
 import os

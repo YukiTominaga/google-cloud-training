@@ -45,7 +45,7 @@ def main() -> None:
         location=os.environ.get("LOCATION", "us-central1"),
     )
     # ⚠️ メソッド名は移行中（deploy_sdk.py のコメント参照）。
-    #   ガイドの記載は client.runtimes.create(...)。
+    #   新しい SDK では client.runtimes.create(...)、
     #   runtimes が無いバージョンの SDK では agent_engines.create(...) を使う。
     runtimes = getattr(client, "runtimes", None) or client.agent_engines
     remote_agent = runtimes.create(config=build_config())

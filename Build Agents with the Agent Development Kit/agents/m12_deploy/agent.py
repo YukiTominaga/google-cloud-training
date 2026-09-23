@@ -27,6 +27,22 @@
 #
 # ⚠️ デプロイ時には import 文を相対 import（from .tools ...）にしておくこと。
 #   Agent Runtime 上ではこのフォルダがパッケージとして読み込まれる。
+#
+# ■ 試すプロンプト（adk web / adk run で入力）
+#   ※ デプロイ前は API キーだけで adk web で動く。デプロイ後は同じプロンプトを
+#     Agent Runtime 上の agent に投げ、ローカルと同じ委譲・tool 呼び出しになるかを比べる。
+#   1. 「A-1001 の残高を教えて」
+#      → billing_agent（single_turn）が tool として呼ばれ、中で lookup_account が動く。
+#        BillingResult の JSON が coordinator に返る
+#   2. 「A-1001 の残高と、注文 O-5001 の配達予定日を教えて」
+#      → billing_agent と shipping_agent の両方に委譲され、結果が 1 つの返答にまとまる
+#   3. 「注文を返品したい」
+#      → returns_agent（task）が注文 ID と理由を聞き返す。「O-5002、サイズが合わなかった」
+#        と答えると lookup_order → check_return_policy → initiate_return と進み、
+#        finish_task で coordinator に戻る
+#   4. 「注文 O-5001 を返品したい。理由は気が変わったから」
+#      → O-5001 は未配達（shipped）なので check_return_policy が eligible: false を返す。
+#        initiate_return が呼ばれないことをトレースで確認
 # =====================================================================
 
 import os

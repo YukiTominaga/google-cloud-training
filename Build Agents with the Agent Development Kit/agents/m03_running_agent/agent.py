@@ -24,6 +24,18 @@
 #     ├── m02_configuring_agent/
 #     └── m03_running_agent/  ...
 #   $ cd agents && adk web .   → m01〜m13 を切り替えて試せる
+#
+# ■ 試すプロンプト（adk web / adk run で入力）
+#   1. 「A-1001 の残高は？」
+#      → トレースが function_call lookup_account(account_id="A-1001")
+#        → function_response（balance 128.5）→ 最終応答 の形になるか確認する（Code 5）
+#   2. 「A-1002 の残高と状態を教えて」
+#      → lookup_account が呼ばれ、残高 0.0 と状態 suspended が返る
+#   3. 「A-9999 の残高は？」
+#      → lookup_account が status "error" を返し、見つからなかったと伝える
+#   4. 「A-1001 の請求書を一覧して」
+#      → 残高以外は対応範囲外で、請求書を取る tool も無い。
+#        トレースで tool が呼ばれたか・どう断ったかを確認する
 # =====================================================================
 
 import os

@@ -169,7 +169,7 @@ fanout_workflow = Workflow(
 # 前段の output_schema と後段の input_schema を同じ型にすると、
 # 型付きのデータが辺に沿って流れる（文字列のパースが不要になる）。
 #
-# ⚠️ ガイドの instruction にある "{Ticket.order_id}" は、ADK の
+# ⚠️ instruction に "{Ticket.order_id}" のように書いても、ADK の
 #   instruction テンプレート（state のキーを {key} で埋め込む仕組み）
 #   では「有効なキー名ではない」ため置換されず、そのままの文字列で
 #   モデルに渡る（2.9.2 で確認）。入力はノードの入力として届くので、

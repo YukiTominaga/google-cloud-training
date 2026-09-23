@@ -19,6 +19,22 @@
 #   3. 社内の MCP サーバー URL を置き換える
 #   Cloud 環境なしで試したいときは、末尾の root_agent を
 #   routing.retrieval_router に差し替える（API キーだけで動く）。
+#
+# ■ 試すプロンプト（adk web / adk run で入力）
+#   ※ API キーだけで試す前提。末尾の root_agent を routing.retrieval_router に
+#     差し替えてから入力する（grounded_support_agent は Cloud 環境が必要）。
+#     ダミー文書は英語で、search_documents_tool は単純なキーワード一致なので、
+#     英語のキーワードを添えると当たりやすい。
+#   1. 「返品（return）は何日以内ならできますか？」
+#      → search_documents_tool が呼ばれ、return-policy.md の一節が引用される
+#   2. 「A-1001 の最近の注文を見せて」
+#      → sql_query_tool（query_orders）が呼ばれるが、adk web では state に
+#        session_user_id が無いため "denied" が返る（tool 内の認可が効く様子）
+#   3. 「A-1001 の注文 O-5002 は返品（return）できますか？」
+#      → sql_query_tool と search_documents_tool の両方が呼ばれることをトレースで確認
+#   4. 「ギフトラッピング（gift wrapping）はできますか？」
+#      → search_documents_tool が "not_found" を返し、推測せずにその旨を伝えるかを見る
+#        （モデルが query に policy などを足すと別の文書に当たることもある）
 # =====================================================================
 
 import os
@@ -50,11 +66,11 @@ orders_toolset = McpToolset(
 )
 
 # ---------------------------------------------------------------------
-# ⚠️ 講師ガイド Code 6 からの変更点：bypass_multi_tools_limit=True
+# ⚠️ 検索 tool と function calling を同居させる：bypass_multi_tools_limit=True
 # ---------------------------------------------------------------------
 # Gemini API は「組み込みの検索 tool（google_search / VertexAiSearchTool）」と
 # 「function calling（MCP の tool や関数 tool）」を 1 つのリクエストに
-# 同居させられない。ガイドのように 3 つを 1 つの agent に並べると、
+# 同居させられない。そのまま 3 つを 1 つの agent に並べると、
 # 実行時に Gemini API 側でエラーになる。
 #
 # ADK 2.9.2 ではコンストラクタに bypass_multi_tools_limit=True を渡すと、

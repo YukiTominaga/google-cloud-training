@@ -25,7 +25,15 @@
 #   cd agents
 #   adk web            # ブラウザ UI（http://localhost:8000）。まずはこちら
 #   adk run m01_adk    # ターミナルの REPL
-#   デモ：「A-1001 の残高は？」→ 次に「A-9999 の残高は？」（エラー時の振る舞い）
+#
+# ■ 試すプロンプト（adk web / adk run で入力）
+#   1. 「A-1001 の残高を教えて」
+#      → lookup_account(account_id="A-1001") が呼ばれ、残高 128.50 と状態 active が返る
+#   2. 「A-1002 のアカウントの状態は？」
+#      → lookup_account が呼ばれ、残高 0.0 と状態 suspended が返る
+#   3. 「A-9999 の残高は？」
+#      → lookup_account が status "error" を返す。数字をでっち上げずに
+#        エラーを伝えるか（instruction の最後の 1 文の効果）を確認する
 # =====================================================================
 
 import os

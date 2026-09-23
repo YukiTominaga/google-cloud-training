@@ -23,6 +23,20 @@
 #         customers. Does not handle HR or IT support requests."
 #   「何をするか」に加えて「何をしないか」まで書くのがポイント。
 #   下の root_agent の description も、登録時の Description と同じ考え方で書く。
+#
+# ■ 試すプロンプト（adk web / adk run で入力）
+#   ※ adk web では API キーだけで動く。Gemini Enterprise app で試すには、
+#     publish_end_to_end.sh（または register_agent.sh）で登録済みであること。
+#   1. 「A-1001 の請求書を一覧にして」
+#      → billing_agent に委譲され、lookup_account → list_invoices の順に呼ばれる
+#   2. 「注文 O-5003 はいつ届きますか？」
+#      → shipping_agent に委譲され、track_order と get_delivery_estimate が呼ばれる
+#   3. 「注文 O-5002 を返品したい。サイズが合わなかった」
+#      → returns_agent（task）に委譲され、返品可能なら initiate_return で RMA ID が発行される
+#   4. 「有給休暇の残り日数を知りたい」／「社内 VPN につながらない」
+#      → 担当外（HR / IT）。Gemini Enterprise app では Description の「Does not handle」を
+#        読んだルーティングモデルがこの agent に回さないのが正しい動き。adk web では
+#        どの専門 agent にも委譲されないかをトレースで確認する
 # =====================================================================
 
 import os

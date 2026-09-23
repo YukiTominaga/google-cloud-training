@@ -38,6 +38,21 @@
 #   「specialist が仕事を終えて coordinator に戻った」印。
 #
 #   Code 5（AgentTool）の例は agent_tool_example.py にあります。
+#   3 つの mode を見比べるには、adk web で m09_task_collaboration_chat / _task /
+#   _single_turn を選ぶ（組み立て方と比較用プロンプトは mode_variants.py）。
+#
+# ■ 試すプロンプト（adk web / adk run で入力）
+#   1. 「A-1001 の残高と、注文 O-5001 の配達予定日を教えて」
+#      → coordinator が billing_agent(request=...) と shipping_agent(request=...) を
+#        tool として呼び、BillingResult / ShippingResult の JSON を受け取ってまとめる
+#   2. 「返品したいです」→ 聞き返されたら「O-5002 です。サイズが合いませんでした」
+#      → returns_agent（task）が注文 ID と理由を聞き返し、lookup_order →
+#        check_return_policy → initiate_return の後、finish_task で coordinator に戻る
+#   3. 「注文 O-5003 を返品したい。気が変わった」
+#      → O-5003 は処理中（processing）なので check_return_policy が eligible false を返し、
+#        initiate_return は呼ばれない
+#   4. 「A-9999 の残高を教えて」
+#      → billing_agent の lookup_account が "error"（存在しないアカウント）を返す
 # =====================================================================
 
 import os

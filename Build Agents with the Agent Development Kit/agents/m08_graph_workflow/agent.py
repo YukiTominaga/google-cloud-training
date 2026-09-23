@@ -18,7 +18,7 @@
 #           [LLM]          [関数]    ├──▶ returns_gate  (→ returns_agent)  ─┘ (JoinNode)  [LLM]
 #                                  └──▶ fallback_agent（どれにも当たらないとき）
 #  ※ gate は「担当カテゴリなら specialist を呼び、担当外なら "N/A" を返す」関数ノード。
-#    ガイドの書き方から変えた理由は router の下のコメントを参照。
+#    この形にしている理由は gate の定義の上のコメントを参照。
 #
 # ■ 覚えておくこと
 #   ・END ノードは存在しない。出ていく辺の無いノードに着いたら終了。
@@ -26,6 +26,20 @@
 #   ・ノードの中で広い except Exception を書くと、ADK の自動リトライが効かなくなる。
 #   ・ADK 2.9.0 以降、resume 時に失敗ノードは「再実行」される。
 #     返品登録・決済のような副作用のあるノードは冪等に書くこと。
+#
+# ■ 試すプロンプト（adk web / adk run で入力）
+#   1. 「A-1001 の残高を教えて」
+#      → classifier が BILLING を返し、billing_gate だけが billing_agent を呼ぶ。
+#        shipping_gate / returns_gate は LLM を呼ばずに "N/A" → join → synthesizer
+#   2. 「注文 O-5001 の配送状況と、返品できるかを教えて」
+#      → SHIPPING,RETURNS で 2 つの gate が specialist を呼ぶ（fan-out）。
+#        O-5001 は配達前なので check_return_policy は eligible false
+#   3. 「おすすめの傘を教えて」
+#      → 既知カテゴリが無いので router が DEFAULT_ROUTE を返し、fallback_agent で終了する
+#        （join / synthesizer は動かない）
+#   4. 「A-1001 の残高と、注文 O-5001 の配送状況を教えて」
+#      → Ticket の order_id は 1 つだけなので、どちらかの specialist には
+#        ID が渡らない。トレースで各 gate の node_input を確認する
 # =====================================================================
 
 import os
@@ -63,7 +77,7 @@ classifier = Agent(
         "その ID も出力してください（書かれていなければ空文字列）。"
     ),
     output_schema=Ticket,
-    mode="single_turn",  # ← グラフ内の Agent は必ず single_turn（講師から必ず言う 1 行）
+    mode="single_turn",  # ← グラフ内の Agent は必ず single_turn にする
 )
 
 
@@ -99,9 +113,9 @@ def router(node_input: Ticket | dict):
 # ---------------------------------------------------------------------
 # [関数ノード] gate：該当カテゴリのときだけ specialist を呼ぶ
 # ---------------------------------------------------------------------
-# ⚠️ 講師ガイド Code 6 からの変更点（google-adk 2.9.2 で動作確認済みの挙動）
-#   ガイドの書き方（router が Event(route=["BILLING", "SHIPPING"]) を返し、
-#   発火した specialist だけが JoinNode に合流する）だと、
+# ⚠️ なぜ router で直接 specialist を選ばないのか（google-adk 2.9.2 で確認した挙動）
+#   router が Event(route=["BILLING", "SHIPPING"]) を返し、
+#   発火した specialist だけを JoinNode に合流させる書き方だと、
 #   JoinNode は「つながっている前段ノードが“すべて”完了する」まで待つため、
 #   3 つのうち一部しか発火しなかった場合に join が永遠に発火せず、
 #   synthesizer が実行されない（3 カテゴリ全部に該当したときしか合流しない）。

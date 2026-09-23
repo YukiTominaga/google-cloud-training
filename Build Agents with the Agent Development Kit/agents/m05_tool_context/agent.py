@@ -13,6 +13,24 @@
 #   Code 1〜3 の単独の例は tool_context_examples.py、
 #   Runner から state を渡して実行する例は run_with_session.py にあります。
 #     cd agents && python -m m05_tool_context.run_with_session
+#
+# ■ 試すプロンプト（adk web / adk run で入力）
+#   ※ adk web にはログインが無いため、_demo_sign_in が session_user_id を
+#     A-1001 に設定する（A-1001 でログイン中の扱い）
+#   1. 「A-1001 の残高を教えて」
+#      → lookup_account が success（残高 128.50、状態 active）を返し、
+#        state に verified_account_id="A-1001" が書かれる（State タブで確認）
+#   2. 「A-1002 の残高は？」
+#      → 本人の口座ではないので lookup_account が status "denied" を返す。
+#        数値を出さずに断るか確認する
+#   3. 「A-1001 の請求書を一覧して」
+#      → lookup_account → list_invoices の順。list_invoices は account_id を受け取らず、
+#        state の verified_account_id を読む。INV-9002 / INV-9001 が返る
+#   4. 「A-1001 の請求書を PDF にして」
+#      → lookup_account → export_invoices_pdf の順。A-1001_invoices.pdf が
+#        artifact として保存される（Artifacts タブで確認。PDF 本体は会話に入らない）
+#   5. 「さっきの PDF のサイズは？」
+#      → read_back(filename="A-1001_invoices.pdf") が呼ばれ、size_bytes だけが返る
 # =====================================================================
 
 import os

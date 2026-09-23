@@ -25,7 +25,7 @@ MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 research_agent = Agent(
     name="research_agent",
     model=MODEL,
-    instruction="Answer questions using Google Search. Always cite sources.",
+    instruction="Google 検索を使って質問に答えてください。必ず出典を示してください。",
     tools=[google_search],  # 組み込み tool はインスタンスをそのまま渡す
 )
 
@@ -40,6 +40,6 @@ DATASTORE_ID = (
 internal_search_agent = Agent(
     name="internal_search_agent",
     model=MODEL,
-    instruction="Answer using internal document search. Always cite sources.",
+    instruction="社内文書検索を使って答えてください。必ず出典を示してください。",
     tools=[VertexAiSearchTool(data_store_id=DATASTORE_ID)],
 )

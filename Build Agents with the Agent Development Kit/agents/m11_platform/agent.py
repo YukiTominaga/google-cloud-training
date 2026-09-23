@@ -59,11 +59,11 @@ root_agent = Agent(
     name="support_coordinator",
     model=MODEL,
     description="Answers billing and shipping questions and remembers returning customers.",
-    instruction="""You are a customer support agent for an online retailer.
-At the start of a conversation, use load_memory to recall what this customer
-told you before (for example their account ID or preferences).
-Use lookup_account / list_invoices for billing and track_order /
-get_delivery_estimate for shipping. Never state a figure that did not come from a tool.""",
+    instruction="""あなたはオンライン小売店のカスタマーサポート agent です。
+会話の最初に load_memory を使い、この顧客が以前伝えてくれた内容
+（アカウント ID や好みなど）を思い出してください。
+請求には lookup_account / list_invoices を、配送には track_order /
+get_delivery_estimate を使ってください。tool から得ていない数値は決して伝えないでください。""",
     tools=[load_memory, lookup_account, list_invoices, track_order, get_delivery_estimate],
     after_agent_callback=save_session_to_memory,
 )

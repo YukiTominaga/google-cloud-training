@@ -44,21 +44,21 @@ MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 validate_agent = Agent(
     name="validate_agent",
     model=MODEL,
-    instruction="Check that the customer's order request names a product and a quantity. "
-    "Reply with the normalized request, or 'INVALID' with a reason.",
+    instruction="顧客の注文依頼に商品名と数量が含まれているか確認してください。"
+    "含まれていれば正規化した依頼内容を返し、含まれていなければ 'INVALID' と理由を返してください。",
     output_key="validated_order",
 )
 pricing_agent = Agent(
     name="pricing_agent",
     model=MODEL,
-    instruction="Estimate a price for this validated order: {validated_order}. "
-    "Assume USD 10 per unit.",
+    instruction="検証済みの次の注文について価格を見積もってください: {validated_order}。"
+    "単価は 1 個あたり 10 USD とします。",
     output_key="priced_order",
 )
 confirm_agent = Agent(
     name="confirm_agent",
     model=MODEL,
-    instruction="Write a one-paragraph order confirmation for the customer based on: {priced_order}",
+    instruction="次の内容をもとに、顧客向けの注文確認文を 1 段落で書いてください: {priced_order}",
 )
 
 order_pipeline = SequentialAgent(
@@ -81,16 +81,16 @@ order_pipeline = SequentialAgent(
 draft_agent = Agent(
     name="draft_agent",
     model=MODEL,
-    instruction="Write (or improve) a short reply to the customer's complaint. "
-    "Previous feedback, if any: {review_feedback?}",
+    instruction="顧客からの苦情に対する短い返信を書いてください（既にあれば改善してください）。"
+    "前回のフィードバック（あれば）: {review_feedback?}",
     output_key="draft_reply",
 )
 quality_agent = Agent(
     name="quality_agent",
     model=MODEL,
-    instruction="""Review this draft reply: {draft_reply}
-If it is polite, specific, and under 80 words, call the `exit_loop` tool.
-Otherwise reply with one sentence of concrete feedback.""",
+    instruction="""次の返信案をレビューしてください: {draft_reply}
+丁寧かつ具体的で、200 文字以内であれば `exit_loop` tool を呼び出してください。
+そうでなければ、具体的なフィードバックを 1 文で返してください。""",
     tools=[exit_loop],
     output_key="review_feedback",
 )
@@ -116,19 +116,19 @@ refine_loop = LoopAgent(
 inventory_agent = Agent(
     name="inventory_agent",
     model=MODEL,
-    instruction="Say whether the requested product is in stock (assume yes).",
+    instruction="依頼された商品の在庫があるかどうかを答えてください（在庫ありと仮定してよい）。",
     output_key="inventory_info",
 )
 promotions_agent = Agent(
     name="promotions_agent",
     model=MODEL,
-    instruction="Mention one current promotion (invent a plausible one).",
+    instruction="現在実施中のキャンペーンを 1 つ紹介してください（もっともらしいものを考えてよい）。",
     output_key="promotions_info",
 )
 account_agent = Agent(
     name="account_agent",
     model=MODEL,
-    instruction="Say the customer is a member in good standing.",
+    instruction="この顧客は問題のない優良会員であると伝えてください。",
     output_key="account_info",
 )
 
@@ -139,7 +139,7 @@ lookup_parallel = ParallelAgent(
 lookup_gather = Agent(
     name="lookup_gather",
     model=MODEL,
-    instruction="Combine into one reply: {inventory_info} / {promotions_info} / {account_info}",
+    instruction="次の内容を 1 つの返信にまとめてください: {inventory_info} / {promotions_info} / {account_info}",
 )
 lookup_pipeline = SequentialAgent(
     name="lookup_pipeline", sub_agents=[lookup_parallel, lookup_gather]
@@ -160,12 +160,12 @@ lookup_pipeline = SequentialAgent(
 support_summary = Agent(
     name="support_summary",
     model=MODEL,
-    instruction="""Combine the specialist answers into one reply to the customer.
-Ignore any answer that is "N/A".
+    instruction="""specialist の回答を、顧客への 1 つの返信にまとめてください。
+"N/A" の回答は無視してください。
 
-Billing: {billing_response?}
-Shipping: {shipping_response?}
-Returns: {returns_response?}
+請求: {billing_response?}
+配送: {shipping_response?}
+返品: {returns_response?}
 """,
 )
 

@@ -39,9 +39,9 @@ sequential_equivalent = Workflow(
     edges=[
         (
             "START",
-            _agent("validate", "Normalize the order request (product and quantity)."),
-            _agent("pricing", "Price the order you receive at USD 10 per unit."),
-            _agent("confirm", "Write a short order confirmation for what you receive."),
+            _agent("validate", "注文依頼（商品と数量）を正規化してください。"),
+            _agent("pricing", "受け取った注文の価格を、1 個あたり 10 USD で計算してください。"),
+            _agent("confirm", "受け取った内容について、短い注文確認文を書いてください。"),
         ),
     ],
 )
@@ -49,8 +49,12 @@ sequential_equivalent = Workflow(
 # ---------------------------------------------------------------------
 # Parallel の置き換え：fan-out ＋ JoinNode
 # ---------------------------------------------------------------------
-_inventory = _agent("inventory", "Say whether the product is in stock (assume yes).")
-_promotions = _agent("promotions", "Mention one plausible current promotion.")
+_inventory = _agent(
+    "inventory", "商品の在庫があるかどうかを答えてください（在庫ありと仮定してよい）。"
+)
+_promotions = _agent(
+    "promotions", "現在実施中のもっともらしいキャンペーンを 1 つ紹介してください。"
+)
 _join = JoinNode(name="join")
 parallel_equivalent = Workflow(
     name="lookup_wf",
@@ -59,7 +63,7 @@ parallel_equivalent = Workflow(
         ("START", _promotions),
         (_inventory, _join),
         (_promotions, _join),
-        (_join, _agent("gather", "Combine the inputs you receive into one reply.")),
+        (_join, _agent("gather", "受け取った入力を 1 つの返信にまとめてください。")),
     ],
 )
 
@@ -69,11 +73,14 @@ parallel_equivalent = Workflow(
 # ctx.run_node(ノード, node_input=...) で、関数の中から別のノードを
 # 動的に実行し、その結果を await で受け取れる。
 # 回数上限（max_iterations 相当）は普通の range() で表現できる。
-_drafter = _agent("drafter", "Write or improve a short, polite reply to the complaint you receive.")
+_drafter = _agent(
+    "drafter",
+    "受け取った苦情に対する、短く丁寧な返信を書いてください（既にあれば改善してください）。",
+)
 _reviewer = _agent(
     "reviewer",
-    "Review the draft you receive. Reply 'APPROVED' if it is polite and under 80 words, "
-    "otherwise give one sentence of feedback.",
+    "受け取った返信案をレビューしてください。丁寧で 200 文字以内であれば 'APPROVED' とだけ返し、"
+    "そうでなければフィードバックを 1 文で返してください。",
 )
 
 MAX_ITERATIONS = 5

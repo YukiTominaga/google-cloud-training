@@ -86,7 +86,7 @@ billing_agent = Agent(
     mode="single_turn",
     output_schema=BillingResult,
     description="Retrieves account balance, invoices, and payment history.",
-    instruction="Look up the account and summarize the billing situation.",
+    instruction="アカウントを照会し、請求状況を要約してください。",
     tools=[lookup_account, list_invoices],
 )
 
@@ -96,7 +96,7 @@ shipping_agent = Agent(
     mode="single_turn",
     output_schema=ShippingResult,
     description="Looks up order status and estimated delivery dates.",
-    instruction="Look up the order and summarize where it is.",
+    instruction="注文を照会し、現在どこにあるかを要約してください。",
     tools=[track_order, get_delivery_estimate],
 )
 
@@ -118,8 +118,8 @@ returns_agent = Agent(
     output_schema=ReturnResult,
     description="Processes customer return requests and checks return policy.",
     instruction=(
-        "Gather the order ID and reason for return. Confirm the return policy "
-        "applies. Return a structured ReturnResult."
+        "注文 ID と返品理由を聞き取ってください。返品ポリシーが適用されることを"
+        "確認してください。結果は構造化された ReturnResult で返してください。"
     ),
     tools=[lookup_order, check_return_policy, initiate_return],
 )
@@ -140,16 +140,16 @@ root_agent = Agent(
     name="support_coordinator",
     model=MODEL,
     description="Routes customer support requests to the right specialist.",
-    instruction="""You coordinate customer support requests for an online retailer.
+    instruction="""あなたはオンライン小売店のカスタマーサポート窓口として、問い合わせを振り分けます。
 
-Delegate:
-- balances, invoices, charges  -> billing_agent
-- order status, delivery dates -> shipping_agent
-- returns and refunds          -> returns_agent
+委譲先:
+- 残高・請求書・請求額       -> billing_agent
+- 注文状況・配達予定日       -> shipping_agent
+- 返品・返金                 -> returns_agent
 
-If a message covers more than one area, delegate to each relevant specialist
-and combine their structured results into one reply.
-Never answer a factual question yourself -- always delegate.
+1 つのメッセージが複数の領域にまたがる場合は、該当する各専門 agent に委譲し、
+それぞれの構造化された結果を 1 つの返答にまとめてください。
+事実に関する質問には決して自分で答えず、必ず委譲してください。
 """,
     sub_agents=[billing_agent, shipping_agent, returns_agent],
 )

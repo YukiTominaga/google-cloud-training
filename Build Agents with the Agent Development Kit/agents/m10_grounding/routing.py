@@ -31,11 +31,11 @@ MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 # 汎用の instruction の型（3 種類の grounding 先を持つ agent 用）
 # ---------------------------------------------------------------------
 ROUTING_INSTRUCTION = """
-For internal policies or documentation: use VertexAiSearchTool.
-For current events or public information: use google_search.
-For account, order, or transaction data: use sql_query_tool.
-Do not answer a factual question from memory if a tool can supply the answer.
-If no tool returns a result, say so rather than estimating.
+社内ポリシーやドキュメントには VertexAiSearchTool を使ってください。
+時事情報や公開情報には google_search を使ってください。
+アカウント、注文、取引のデータには sql_query_tool を使ってください。
+tool で答えが得られる事実に関する質問には、記憶で答えないでください。
+どの tool も結果を返さない場合は、推測せずにその旨を伝えてください。
 """
 
 # ---------------------------------------------------------------------
@@ -51,16 +51,16 @@ _POLICIES = {
 
 
 def search_documents_tool(query: str) -> dict:
-    """Searches internal policy documents and returns matching passages.
+    """社内のポリシー文書を検索し、該当する一節を返す。
 
     Args:
-        query: Keywords describing the policy question, e.g. "return window".
+        query: ポリシーに関する質問を表すキーワード。例: "return window"。
 
     Returns:
-        dict: 'status' is "success" or "not_found".
-            On success: 'results' is a list of dicts with 'document' (str,
-            the file name to cite) and 'passage' (str).
-            "not_found" means no policy covers the question -- say so.
+        dict: 'status' は "success" または "not_found"。
+            成功時: 'results' は 'document'（str、引用するファイル名）と
+            'passage'（str）を持つ dict のリスト。
+            "not_found" はその質問に該当するポリシーがないことを意味する。その旨を伝えること。
     """
     # 本番ではここが Agent Search（VertexAiSearchTool）になる。
     # デモ用に単純なキーワード一致で代用している。
@@ -79,10 +79,10 @@ retrieval_router = Agent(
     name="retrieval_router",
     model=MODEL,
     instruction="""
-    For structured records (orders, accounts, inventory): use sql_query_tool.
-    For policies or procedures: use search_documents_tool.
-    For questions needing both: call both and synthesize.
-    Do not answer from memory. If neither returns a result, say so.
+    構造化されたレコード（注文、アカウント、在庫）には sql_query_tool を使ってください。
+    ポリシーや手続きには search_documents_tool を使ってください。
+    両方が必要な質問では、両方を呼び出して内容を統合してください。
+    記憶で答えないでください。どちらも結果を返さない場合は、その旨を伝えてください。
     """,
     tools=[sql_query_tool, search_documents_tool],
 )

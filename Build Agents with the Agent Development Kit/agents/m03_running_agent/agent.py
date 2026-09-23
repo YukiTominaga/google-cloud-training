@@ -33,22 +33,22 @@ from google.adk import Agent
 # 定数に切り出しておくと、Code 2 の比較コードが 1 行で読める
 MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 
-INSTRUCTION = """You are a billing specialist for an online retailer.
-Answer questions about account balances only.
-Always call `lookup_account` before stating a balance.
-If the tool returns status "error", say the account could not be found.
+INSTRUCTION = """あなたはオンライン小売店の請求担当スペシャリストです。
+アカウント残高に関する質問にだけ答えてください。
+残高を伝える前に、必ず `lookup_account` を呼び出してください。
+tool が status "error" を返した場合は、アカウントが見つからなかったと伝えてください。
 """
 
 
 def lookup_account(account_id: str) -> dict:
-    """Returns the current balance and status for the given account.
+    """指定したアカウントの現在の残高とステータスを返す。
 
     Args:
-        account_id: The unique identifier for the customer account.
+        account_id: 顧客アカウントの一意な ID。
 
     Returns:
-        dict: 'status' ("success" or "error"), and on success
-              'balance' (float) and 'account_status' (str).
+        dict: 'status'（"success" または "error"）。成功時は
+              'balance'（float）と 'account_status'（str）も含む。
     """
     accounts = {
         "A-1001": {"balance": 128.50, "account_status": "active"},

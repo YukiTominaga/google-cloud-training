@@ -54,18 +54,17 @@ _RETURN_WINDOW_DAYS = 30
 # billing
 # =====================================================================
 def lookup_account(account_id: str) -> dict:
-    """Returns the current balance and status for a customer account.
+    """顧客アカウントの現在の残高とステータスを返す。
 
-    Call this before answering any question about a balance or payment.
+    残高や支払いに関する質問に答える前に、必ずこれを呼ぶこと。
 
     Args:
-        account_id: The unique identifier for the customer account,
-            in the form "A-1001".
+        account_id: 顧客アカウントの一意な ID。"A-1001" の形式。
 
     Returns:
-        dict: 'status' is "success" or "error".
-            On success: 'balance' (float, USD) and 'account_status' (str).
-            An error means the account does not exist -- do not guess.
+        dict: 'status' は "success" または "error"。
+            成功時: 'balance'（float, USD）と 'account_status'（str）。
+            エラーはアカウントが存在しないことを意味する。推測で答えないこと。
     """
     account = _ACCOUNTS.get(account_id)
     if account is None:
@@ -74,18 +73,18 @@ def lookup_account(account_id: str) -> dict:
 
 
 def list_invoices(account_id: str, limit: int = 3) -> dict:
-    """Lists the most recent invoices for a customer account.
+    """顧客アカウントの直近の請求書を一覧で返す。
 
-    Only call this after `lookup_account` has returned status "success".
+    `lookup_account` が status "success" を返した後にのみ呼ぶこと。
 
     Args:
-        account_id: The unique identifier for the customer account.
-        limit: How many invoices to return, most recent first. Defaults to 3.
+        account_id: 顧客アカウントの一意な ID。
+        limit: 返す請求書の件数（新しい順）。既定値は 3。
 
     Returns:
-        dict: 'status' is "success" or "error".
-            On success: 'invoices' is a list of dicts with 'id' (str),
-            'amount' (float, USD) and 'issued_on' (str, YYYY-MM-DD).
+        dict: 'status' は "success" または "error"。
+            成功時: 'invoices' は 'id'（str）、'amount'（float, USD）、
+            'issued_on'（str, YYYY-MM-DD）を持つ dict のリスト。
     """
     invoices = _INVOICES.get(account_id)
     if invoices is None:
@@ -98,16 +97,16 @@ def list_invoices(account_id: str, limit: int = 3) -> dict:
 # shipping
 # =====================================================================
 def track_order(order_id: str) -> dict:
-    """Returns the current shipping status of an order.
+    """注文の現在の配送状況を返す。
 
     Args:
-        order_id: The order to track, in the form "O-5001".
+        order_id: 追跡する注文。"O-5001" の形式。
 
     Returns:
-        dict: 'status' is "success" or "error".
-            On success: 'order_status' (str, one of "processing", "shipped",
-            "delivered") and 'carrier' (str or null if not shipped yet).
-            An error means the order does not exist.
+        dict: 'status' は "success" または "error"。
+            成功時: 'order_status'（str。"processing"、"shipped"、
+            "delivered" のいずれか）と 'carrier'（str。未発送なら null）。
+            エラーは注文が存在しないことを意味する。
     """
     order = _ORDERS.get(order_id)
     if order is None:
@@ -121,15 +120,15 @@ def track_order(order_id: str) -> dict:
 
 
 def get_delivery_estimate(order_id: str) -> dict:
-    """Returns the estimated delivery date for an order that is not yet delivered.
+    """まだ配達されていない注文のお届け予定日を返す。
 
     Args:
-        order_id: The order to estimate, in the form "O-5001".
+        order_id: 予定日を調べる注文。"O-5001" の形式。
 
     Returns:
-        dict: 'status' is "success" or "error".
-            On success: 'eta' (str, YYYY-MM-DD).
-            An error means the order does not exist or was already delivered.
+        dict: 'status' は "success" または "error"。
+            成功時: 'eta'（str, YYYY-MM-DD）。
+            エラーは注文が存在しないか、すでに配達済みであることを意味する。
     """
     if order_id not in _ORDERS:
         return {"status": "error", "message": f"Order {order_id} not found."}
@@ -143,15 +142,15 @@ def get_delivery_estimate(order_id: str) -> dict:
 # returns
 # =====================================================================
 def lookup_order(order_id: str) -> dict:
-    """Returns the details of an order needed to decide on a return.
+    """返品の可否を判断するのに必要な注文の詳細を返す。
 
     Args:
-        order_id: The order to look up, in the form "O-5001".
+        order_id: 調べる注文。"O-5001" の形式。
 
     Returns:
-        dict: 'status' is "success" or "error".
-            On success: 'order_status' (str), 'placed_on' (str, YYYY-MM-DD),
-            'delivered_on' (str or null) and 'total' (float, USD).
+        dict: 'status' は "success" または "error"。
+            成功時: 'order_status'（str）、'placed_on'（str, YYYY-MM-DD）、
+            'delivered_on'（str または null）、'total'（float, USD）。
     """
     order = _ORDERS.get(order_id)
     if order is None:
@@ -167,17 +166,17 @@ def lookup_order(order_id: str) -> dict:
 
 
 def check_return_policy(order_id: str) -> dict:
-    """Checks whether an order is eligible for return under the current policy.
+    """注文が現在の返品ポリシーで返品可能かどうかを確認する。
 
-    Call this after `lookup_order` and before `initiate_return`.
+    `lookup_order` の後、`initiate_return` の前に呼ぶこと。
 
     Args:
-        order_id: The order to check, in the form "O-5001".
+        order_id: 確認する注文。"O-5001" の形式。
 
     Returns:
-        dict: 'status' is "success" or "error".
-            On success: 'eligible' (bool) and 'reason' (str).
-            If 'eligible' is false, do not call `initiate_return`.
+        dict: 'status' は "success" または "error"。
+            成功時: 'eligible'（bool）と 'reason'（str）。
+            'eligible' が false なら `initiate_return` を呼ばないこと。
     """
     order = _ORDERS.get(order_id)
     if order is None:
@@ -196,19 +195,18 @@ def check_return_policy(order_id: str) -> dict:
 
 
 def initiate_return(order_id: str, reason: str) -> dict:
-    """Starts a return for an eligible order and issues an RMA ID.
+    """返品可能な注文の返品手続きを開始し、RMA ID を発行する。
 
-    Only call this after `check_return_policy` returned 'eligible' true.
+    `check_return_policy` が 'eligible' true を返した後にのみ呼ぶこと。
 
     Args:
-        order_id: The order to return, in the form "O-5001".
-        reason: The customer's reason for the return, in their own words.
+        order_id: 返品する注文。"O-5001" の形式。
+        reason: 顧客自身の言葉で書いた返品理由。
 
     Returns:
-        dict: 'status' is "success" or "error".
-            On success: 'rma_id' (str) is the return authorization ID.
-            An error means the return could not be started -- do not
-            promise a refund.
+        dict: 'status' は "success" または "error"。
+            成功時: 'rma_id'（str）は返品承認 ID。
+            エラーは返品を開始できなかったことを意味する。返金を約束しないこと。
     """
     if order_id not in _ORDERS:
         return {"status": "error", "message": f"Order {order_id} not found."}

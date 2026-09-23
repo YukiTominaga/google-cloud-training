@@ -53,21 +53,20 @@ _INVOICES = {
 #   Args         : 各引数に何を期待するか（形式の例 "A-1001" まで書く）
 #   Returns      : 戻り値の解釈。特にエラーのときにどう振る舞うべきか
 def lookup_account(account_id: str) -> dict:
-    """Returns the current balance and status for a customer account.
+    """顧客アカウントの現在の残高とステータスを返す。
 
-    Call this before answering any question about a balance, a payment,
-    or whether an account is active.
+    残高・支払い・アカウントが有効かどうかに関する質問に答える前に、
+    必ずこれを呼び出すこと。
 
     Args:
-        account_id: The unique identifier for the customer account,
-            in the form "A-1001".
+        account_id: 顧客アカウントの一意な ID。"A-1001" の形式。
 
     Returns:
-        dict: 'status' is "success" or "error".
-            On success: 'balance' (float, USD) and
-            'account_status' (str, one of "active" or "suspended").
-            On error: 'message' (str) explains why the lookup failed.
-            An error means the account does not exist -- do not guess a balance.
+        dict: 'status' は "success" または "error"。
+            成功時: 'balance'（float、USD）と
+            'account_status'（str、"active" または "suspended"）。
+            エラー時: 'message'（str）に照会に失敗した理由が入る。
+            エラーはアカウントが存在しないことを意味する。残高を推測しないこと。
     """
     account = _ACCOUNTS.get(account_id)
     if account is None:
@@ -81,22 +80,22 @@ def lookup_account(account_id: str) -> dict:
 # ・limit: int = 3 のように既定値を付けると、schema 上は「任意引数」になる
 #   （required に入らない）。
 # ・「lookup_account の後に呼ぶ」という依存関係を docstring にも書き、
-#   instruction（下の Tool order）にも書く ＝ ルール 5。
+#   instruction（下の「tool の呼び出し順」）にも書く ＝ ルール 5。
 def list_invoices(account_id: str, limit: int = 3) -> dict:
-    """Lists the most recent invoices for a customer account.
+    """顧客アカウントの直近の請求書を一覧で返す。
 
-    Only call this after `lookup_account` has returned status "success"
-    for the same account_id.
+    同じ account_id に対して `lookup_account` が status "success" を
+    返した後にだけ呼び出すこと。
 
     Args:
-        account_id: The unique identifier for the customer account.
-        limit: How many invoices to return, most recent first. Defaults to 3.
+        account_id: 顧客アカウントの一意な ID。
+        limit: 返す請求書の件数（新しい順）。既定値は 3。
 
     Returns:
-        dict: 'status' is "success" or "error".
-            On success: 'invoices' is a list of dicts, each with
-            'id' (str), 'amount' (float, USD) and 'issued_on' (str, YYYY-MM-DD).
-            An empty list means the account has no invoices on record.
+        dict: 'status' は "success" または "error"。
+            成功時: 'invoices' は dict のリストで、各要素は
+            'id'（str）、'amount'（float、USD）、'issued_on'（str、YYYY-MM-DD）を持つ。
+            空のリストは、そのアカウントに請求書の記録が無いことを意味する。
     """
     invoices = _INVOICES.get(account_id)
     if invoices is None:
@@ -113,18 +112,18 @@ root_agent = Agent(
     name="billing_agent",
     model=MODEL,
     description="Answers billing and payment questions.",
-    instruction="""You are a billing specialist for an online retailer.
-Scope: account balances, payment history, and invoices only.
+    instruction="""あなたはオンライン小売店の請求担当スペシャリストです。
+対応範囲: アカウント残高、支払い履歴、請求書のみ。
 
-Tool order:
-1. Always call `lookup_account` first with the customer's account ID.
-2. Only if it returns status "success", you may call `list_invoices`
-   with the same account ID.
+tool の呼び出し順:
+1. 必ず最初に、顧客のアカウント ID で `lookup_account` を呼び出してください。
+2. それが status "success" を返した場合にだけ、同じアカウント ID で
+   `list_invoices` を呼び出してかまいません。
 
-Rules:
-- Never state a balance or an invoice amount that did not come from a tool.
-- If a tool returns status "error", tell the customer the account could not
-  be found. Do not estimate.
+ルール:
+- tool から得たもの以外の残高や請求額は絶対に伝えないでください。
+- tool が status "error" を返した場合は、アカウントが見つからなかったと
+  顧客に伝えてください。概算はしないでください。
 """,
     tools=[lookup_account, list_invoices],
 )

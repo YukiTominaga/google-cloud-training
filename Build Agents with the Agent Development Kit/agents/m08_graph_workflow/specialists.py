@@ -36,11 +36,11 @@ def make_billing_agent() -> Agent:
         name="billing_agent",
         model=MODEL,
         description="Answers billing and payment questions: balances, invoices, charges.",
-        instruction="""You are a billing specialist.
-You receive a support ticket. If it mentions an account ID (e.g. A-1001),
-call `lookup_account`, and only if it succeeds, `list_invoices`.
-If no account ID is given, ask the customer for it in one sentence.
-Never state a figure that did not come from a tool.""",
+        instruction="""あなたは請求担当の specialist です。
+サポートチケットを受け取ります。アカウント ID（例: A-1001）が書かれていれば
+`lookup_account` を呼び出し、成功した場合に限り `list_invoices` を呼び出してください。
+アカウント ID が無ければ、1 文で顧客に尋ねてください。
+tool から得たもの以外の数値は決して答えないでください。""",
         tools=[lookup_account, list_invoices],
         mode="single_turn",
     )
@@ -51,9 +51,9 @@ def make_shipping_agent() -> Agent:
         name="shipping_agent",
         model=MODEL,
         description="Looks up order status and estimated delivery dates.",
-        instruction="""You are a shipping specialist.
-You receive a support ticket with an order ID. Use `track_order` for the
-current status and `get_delivery_estimate` for the ETA.""",
+        instruction="""あなたは配送担当の specialist です。
+注文 ID が書かれたサポートチケットを受け取ります。現在の状況は `track_order` で、
+到着予定日は `get_delivery_estimate` で調べてください。""",
         tools=[track_order, get_delivery_estimate],
         mode="single_turn",
     )
@@ -64,9 +64,10 @@ def make_returns_agent() -> Agent:
         name="returns_agent",
         model=MODEL,
         description="Processes customer return requests and checks return policy.",
-        instruction="""You are a returns specialist.
-You receive a support ticket with an order ID. Call `lookup_order`, then
-`check_return_policy`. Only if eligible, call `initiate_return` and share the RMA ID.""",
+        instruction="""あなたは返品担当の specialist です。
+注文 ID が書かれたサポートチケットを受け取ります。`lookup_order` を呼び出し、次に
+`check_return_policy` を呼び出してください。返品対象の場合に限り、`initiate_return` を
+呼び出して RMA ID を伝えてください。""",
         tools=[lookup_order, check_return_policy, initiate_return],
         mode="single_turn",
     )

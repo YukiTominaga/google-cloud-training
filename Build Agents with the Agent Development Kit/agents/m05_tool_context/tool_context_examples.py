@@ -22,13 +22,13 @@ from .agent import lookup_account as _lookup_account_with_auth
 #     tool_context.actions          … 次の一手の指示（Code 3）
 # =====================================================================
 async def tool_function(user_query: str, tool_context: ToolContext) -> dict:
-    """Generic tool function.
+    """汎用的な tool 関数。
 
     Args:
-        user_query: The user's query.
+        user_query: ユーザーの問い合わせ内容。
 
     Returns:
-        dict: the result of the lookup.
+        dict: 照会の結果。
     """
     # session state の読み書き（同期。dict と同じ感覚で扱える）
     tool_context.state["user_query"] = user_query
@@ -54,14 +54,14 @@ async def tool_function(user_query: str, tool_context: ToolContext) -> dict:
 # agent.py の lookup_account は、この形を通し題材に組み込んだもの。
 # =====================================================================
 def fetch_account(account_id: str, tool_context: ToolContext) -> dict:
-    """Returns account data for the authenticated user.
+    """認証済みユーザーのアカウント情報を返す。
 
     Args:
-        account_id: The account the customer is asking about.
+        account_id: 顧客が尋ねているアカウント。
 
     Returns:
-        dict: 'status' and, on success, 'balance'. 'status' is "error"
-              when the caller is not authorized for that account.
+        dict: 'status'。成功時は 'balance' も含む。呼び出し元にその
+              アカウントへのアクセス権が無い場合、'status' は "error" になる。
     """
     # session_user_id はセッション開始時にアプリが設定するもので、
     # LLM から渡されるものではない
@@ -83,13 +83,13 @@ def fetch_account(account_id: str, tool_context: ToolContext) -> dict:
 #   billing / shipping / returns の 3 体が揃うのは M7 以降。
 # =====================================================================
 def route_to_specialist(category: str, tool_context: ToolContext) -> dict:
-    """Hands the conversation to the specialist for the given category.
+    """指定したカテゴリの担当者に会話を引き継ぐ。
 
     Args:
-        category: One of "billing", "shipping", or "returns".
+        category: "billing"、"shipping"、"returns" のいずれか。
 
     Returns:
-        dict: 'status' and the agent the conversation was handed to.
+        dict: 'status' と、会話の引き継ぎ先の agent。
     """
     targets = {
         "billing": "billing_agent",

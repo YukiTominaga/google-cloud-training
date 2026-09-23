@@ -24,17 +24,17 @@ from google.adk.tools import FunctionTool
 # ✅ Code 1 の関数：型ヒントと docstring が揃っている
 # ---------------------------------------------------------------------
 def lookup_account(account_id: str, include_history: bool = False) -> dict:
-    """Returns the current balance and status for a customer account.
+    """顧客アカウントの現在の残高とステータスを返す。
 
-    Use this before answering any question about a balance or payment.
+    残高や支払いに関する質問に答える前に、これを使うこと。
 
     Args:
-        account_id: The unique identifier for the customer account, e.g. "A-1001".
-        include_history: If True, also return the last 3 payments.
+        account_id: 顧客アカウントの一意な ID。例: "A-1001"。
+        include_history: True の場合、直近 3 件の支払いも返す。
 
     Returns:
-        dict: 'status' is "success" or "error". On success, 'balance' (float)
-              and 'account_status' (str). On error, 'message' (str) explains why.
+        dict: 'status' は "success" または "error"。成功時は 'balance'（float）
+              と 'account_status'（str）。エラー時は 'message'（str）に理由が入る。
     """
     ...
 

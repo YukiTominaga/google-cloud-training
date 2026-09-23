@@ -53,17 +53,16 @@ _INVOICES = {
 #           → 認可は instruction（お願い）ではなく tool（コード）に置く。
 # =====================================================================
 def lookup_account(account_id: str, tool_context: ToolContext) -> dict:
-    """Returns the current balance and status for a customer account.
+    """顧客アカウントの現在の残高とステータスを返す。
 
     Args:
-        account_id: The unique identifier for the customer account,
-            in the form "A-1001".
+        account_id: 顧客アカウントの一意な ID。"A-1001" の形式。
 
     Returns:
-        dict: 'status' is "success", "error", or "denied".
-            On success: 'balance' (float, USD) and 'account_status' (str).
-            "denied" means the signed-in customer does not own that account --
-            apologize and do not reveal any figures.
+        dict: 'status' は "success"、"error"、"denied" のいずれか。
+            成功時: 'balance'（float、USD）と 'account_status'（str）。
+            "denied" はログイン中の顧客がそのアカウントの所有者ではないことを
+            意味する。謝罪し、数値は一切明かさないこと。
     """
     # tool_context.state は dict のように読み書きできる（session state）
     authorized_id = tool_context.state.get("session_user_id")
@@ -85,19 +84,19 @@ def lookup_account(account_id: str, tool_context: ToolContext) -> dict:
 
 
 def list_invoices(tool_context: ToolContext, limit: int = 3) -> dict:
-    """Lists the most recent invoices for the verified account.
+    """確認済みアカウントの直近の請求書を一覧で返す。
 
-    Only call this after `lookup_account` has returned status "success".
+    `lookup_account` が status "success" を返した後にだけ呼び出すこと。
 
     Args:
-        limit: How many invoices to return, most recent first. Defaults to 3.
+        limit: 返す請求書の件数（新しい順）。既定値は 3。
 
     Returns:
-        dict: 'status' is "success" or "error".
-            On success: 'invoices' is a list of dicts with
-            'id' (str), 'amount' (float, USD) and 'issued_on' (str, YYYY-MM-DD).
-            "error" means no account has been verified yet -- call
-            `lookup_account` first.
+        dict: 'status' は "success" または "error"。
+            成功時: 'invoices' は 'id'（str）、'amount'（float、USD）、
+            'issued_on'（str、YYYY-MM-DD）を持つ dict のリスト。
+            "error" はまだアカウントが確認されていないことを意味する。
+            先に `lookup_account` を呼び出すこと。
     """
     # account_id を引数で受け取らず、認可済みの値を state から読む。
     # こうするとモデルが別の ID を渡して回り込む余地がそもそも無くなる。
@@ -153,13 +152,13 @@ def _render_invoices_pdf(account_id: str) -> bytes:
 
 
 async def export_invoices_pdf(tool_context: ToolContext) -> dict:
-    """Renders the verified account's invoices as a PDF and stores it for download.
+    """確認済みアカウントの請求書を PDF にし、ダウンロード用に保存する。
 
-    Only call this after `lookup_account` has returned status "success".
+    `lookup_account` が status "success" を返した後にだけ呼び出すこと。
 
     Returns:
-        dict: 'status', and on success 'filename' and 'version' of the
-              stored artifact. The PDF itself is not returned inline.
+        dict: 'status'。成功時は保存した artifact の 'filename' と 'version'
+              も含む。PDF 本体は戻り値には含まれない。
     """
     account_id = tool_context.state.get("verified_account_id")
     if account_id is None:
@@ -175,13 +174,13 @@ async def export_invoices_pdf(tool_context: ToolContext) -> dict:
 
 
 async def read_back(filename: str, tool_context: ToolContext) -> dict:
-    """Loads a previously stored artifact.
+    """以前に保存した artifact を読み込む。
 
     Args:
-        filename: The artifact name returned by a previous export.
+        filename: 以前のエクスポートで返された artifact 名。
 
     Returns:
-        dict: 'status' and 'size_bytes' of the artifact.
+        dict: 'status' と、artifact の 'size_bytes'。
     """
     part = await tool_context.load_artifact(filename)  # 最新バージョンを読む
     if part is None:
@@ -212,19 +211,19 @@ root_agent = Agent(
     name="billing_agent",
     model=MODEL,
     description="Answers billing and payment questions for the signed-in customer.",
-    instruction="""You are a billing specialist for an online retailer.
-Scope: account balances, invoices, and invoice PDFs for the signed-in customer.
+    instruction="""あなたはオンライン小売店の請求担当スペシャリストです。
+対応範囲: ログイン中の顧客のアカウント残高、請求書、請求書 PDF。
 
-Tool order:
-1. Always call `lookup_account` first with the account ID the customer asks about.
-2. Only after it returns status "success", you may call `list_invoices`
-   or `export_invoices_pdf`.
+tool の呼び出し順:
+1. 必ず最初に、顧客が尋ねているアカウント ID で `lookup_account` を呼び出してください。
+2. それが status "success" を返した後にだけ、`list_invoices` または
+   `export_invoices_pdf` を呼び出してかまいません。
 
-Rules:
-- If a tool returns status "denied", apologize and say you can only share
-  information about the customer's own account. Do not reveal any figures.
-- If a tool returns status "error", say so. Do not estimate.
-- After exporting a PDF, tell the customer the file name. Never paste the PDF.
+ルール:
+- tool が status "denied" を返した場合は、謝罪したうえで、顧客本人のアカウントの
+  情報しかお伝えできないと説明してください。数値は一切明かさないでください。
+- tool が status "error" を返した場合は、そのことを伝えてください。概算はしないでください。
+- PDF をエクスポートした後は、顧客にファイル名を伝えてください。PDF の中身は絶対に貼り付けないでください。
 """,
     tools=[lookup_account, list_invoices, export_invoices_pdf, read_back],
     before_agent_callback=_demo_sign_in,

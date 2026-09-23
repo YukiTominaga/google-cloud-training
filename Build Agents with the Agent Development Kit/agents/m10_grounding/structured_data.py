@@ -51,17 +51,17 @@ def run_sql(sql: str, **params) -> list[dict]:
 
 
 def query_orders(account_id: str, limit: int = 10, *, tool_context: ToolContext) -> dict:
-    """Returns recent orders for a customer account from the orders warehouse.
+    """注文データウェアハウスから、顧客アカウントの最近の注文を返す。
 
     Args:
-        account_id: The unique identifier for the customer account.
-        limit: How many orders to return, most recent first. Defaults to 10.
+        account_id: 顧客アカウントの一意な識別子。
+        limit: 返す注文の件数（新しい順）。既定は 10。
 
     Returns:
-        dict: 'status' is "success", "denied", or "error".
-            On success: 'orders' is a list of dicts with 'order_id' (str),
-            'placed_on' (str, YYYY-MM-DD), and 'total' (float, USD).
-            "denied" means the signed-in customer does not own that account.
+        dict: 'status' は "success"、"denied"、"error" のいずれか。
+            成功時: 'orders' は 'order_id'（str）、'placed_on'（str、YYYY-MM-DD）、
+            'total'（float、USD）を持つ dict のリスト。
+            "denied" はサインイン中の顧客がそのアカウントの所有者でないことを意味する。
     """
     # ① 認可：LLM が渡した account_id を、アプリが入れた値と突き合わせる
     if tool_context.state.get("session_user_id") != account_id:

@@ -30,13 +30,13 @@ billing_tool_agent = Agent(
     model=MODEL,
     # AgentTool では description が「tool の説明」としてモデルに渡る
     description="Looks up an account and returns its balance and recent invoices.",
-    instruction="Look up the account and summarize the billing situation in one sentence.",
+    instruction="アカウントを照会し、請求状況を 1 文で要約してください。",
     tools=[lookup_account, list_invoices],
 )
 
 triage_agent = Agent(
     name="triage_agent",
     model=MODEL,
-    instruction="Use the billing_agent tool when you need a balance figure.",
+    instruction="残高の数値が必要なときは billing_agent tool を使ってください。",
     tools=[AgentTool(agent=billing_tool_agent)],  # ← agent を tool として渡す
 )

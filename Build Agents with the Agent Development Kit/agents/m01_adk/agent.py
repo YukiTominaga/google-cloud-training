@@ -46,16 +46,15 @@ MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 #   3. 型ヒント      → 引数の型
 # つまり docstring と型ヒントは「人間向けのコメント」ではなく
 # 「モデル向けの仕様書」です（詳しくは M4）。
-# そのため docstring はモデルが読みやすい英語のまま残しています。
 def lookup_account(account_id: str) -> dict:
-    """Returns the current balance and status for the given account.
+    """指定したアカウントの現在の残高とステータスを返す。
 
     Args:
-        account_id: The unique identifier for the customer account.
+        account_id: 顧客アカウントの一意な ID。
 
     Returns:
-        dict: 'status' ("success" or "error"), and on success
-              'balance' (float) and 'account_status' (str).
+        dict: 'status'（"success" または "error"）。成功時は
+              'balance'（float）と 'account_status'（str）も含む。
     """
     # 本物の DB の代わりのダミーデータ
     accounts = {
@@ -94,10 +93,10 @@ root_agent = Agent(
     #              「失敗したときの振る舞い」まで書くのが作法。
     #              書かないとモデルは平気で数字をでっち上げる。
     instruction=(
-        "You are a billing specialist. Answer questions about account "
-        "balances, payment history, and invoices. "
-        "Use the lookup_account tool to fetch account data. "
-        "If the tool returns an error, say so instead of guessing."
+        "あなたは請求担当のスペシャリストです。アカウント残高、支払い履歴、"
+        "請求書に関する質問に答えてください。"
+        "アカウント情報の取得には lookup_account tool を使ってください。"
+        "tool がエラーを返した場合は、推測で答えず、エラーだったことを伝えてください。"
     ),
     # tools：関数オブジェクトをそのまま渡す（呼び出し () は付けない）
     tools=[lookup_account],

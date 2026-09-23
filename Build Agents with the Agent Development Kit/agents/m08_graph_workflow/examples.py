@@ -23,8 +23,8 @@ def make_classifier() -> Agent:
         name="classifier",
         model=MODEL,
         instruction=(
-            "Classify the customer message into exactly one of: "
-            "BILLING, SHIPPING, or RETURNS. Reply with the label only."
+            "顧客のメッセージを BILLING, SHIPPING, RETURNS のうち"
+            "ちょうど 1 つに分類してください。ラベルだけを返してください。"
         ),
         # ⚠️ グラフのノードとして使う Agent は mode="single_turn"。
         #    指定しなくても構築時にはエラーにならず、実行して初めて
@@ -92,7 +92,7 @@ def make_fallback_agent() -> Agent:
     return Agent(
         name="fallback_agent",
         model=MODEL,
-        instruction="Apologize and ask the customer to rephrase their question.",
+        instruction="お詫びを述べ、質問を言い換えてもらうよう顧客にお願いしてください。",
         mode="single_turn",
     )
 
@@ -142,7 +142,7 @@ _join = JoinNode(name="join")
 _synthesizer = Agent(
     name="synthesizer",
     model=MODEL,
-    instruction="Combine the specialist answers you were given into one reply to the customer.",
+    instruction="受け取った specialist の回答を、顧客への 1 つの返信にまとめてください。",
     mode="single_turn",
 )
 
@@ -183,7 +183,7 @@ class Ticket(BaseModel):
 typed_classifier = Agent(
     name="classifier",
     model=MODEL,
-    instruction="Classify the message and extract the order ID.",
+    instruction="メッセージを分類し、注文 ID を抜き出してください。",
     output_schema=Ticket,  # 出力の形
     mode="single_turn",
 )
@@ -192,7 +192,7 @@ typed_billing_agent = Agent(
     name="billing_agent",
     model=MODEL,
     input_schema=Ticket,  # 入力の形（前段の output_schema と揃える）
-    instruction="Answer the billing question about the order_id in the Ticket you receive.",
+    instruction="受け取った Ticket の order_id について、請求に関する質問に答えてください。",
     mode="single_turn",
 )
 

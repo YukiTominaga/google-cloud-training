@@ -58,9 +58,9 @@ classifier = Agent(
     name="classifier",
     model=MODEL,
     instruction=(
-        "Read the customer message. Output the categories it belongs to as a "
-        "comma-separated list from BILLING, SHIPPING, RETURNS, and the order ID "
-        "if one is mentioned (otherwise an empty string)."
+        "顧客のメッセージを読んでください。該当するカテゴリを BILLING, SHIPPING, "
+        "RETURNS の中からカンマ区切りのリストで出力し、注文 ID が書かれていれば"
+        "その ID も出力してください（書かれていなければ空文字列）。"
     ),
     output_schema=Ticket,
     mode="single_turn",  # ← グラフ内の Agent は必ず single_turn（講師から必ず言う 1 行）
@@ -138,7 +138,7 @@ fallback_agent = Agent(
     name="fallback_agent",
     model=MODEL,
     description="Handles messages that do not fit any specialist category.",
-    instruction="Apologize and ask the customer to rephrase their question.",
+    instruction="お詫びを述べ、質問を言い換えてもらうよう顧客にお願いしてください。",
     mode="single_turn",
 )
 
@@ -153,9 +153,9 @@ synthesizer = Agent(
     name="synthesizer",
     model=MODEL,
     instruction=(
-        "Combine the specialist answers you were given into one reply to the "
-        'customer. Ignore any answer that is "N/A". '
-        "Do not repeat the same information twice."
+        "受け取った specialist の回答を、顧客への 1 つの返信にまとめてください。"
+        '"N/A" の回答は無視してください。'
+        "同じ情報を繰り返さないでください。"
     ),
     mode="single_turn",
 )

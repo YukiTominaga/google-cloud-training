@@ -25,7 +25,7 @@ def before_model_guard(
     callback_context: CallbackContext,
     llm_request: LlmRequest,
 ) -> Optional[LlmResponse]:
-    """Blocks requests that ask for credentials before they reach the model."""
+    """認証情報を尋ねるリクエストを、モデルに届く前にブロックする。"""
     # llm_request.contents はこれからモデルに送る会話全体。
     # テキスト部分だけをつなげて検査する。
     text = ""

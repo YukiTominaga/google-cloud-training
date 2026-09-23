@@ -32,10 +32,10 @@ billing_agent = Agent(
     name="billing_agent",
     model=MODEL,
     description="Answers billing and payment questions: balances, invoices, charges.",
-    instruction="""You are a billing specialist.
-Always call `lookup_account` first. Only if it succeeds, call `list_invoices`.
-Never state a figure that did not come from a tool.
-If the message has no billing question, reply with "N/A".""",
+    instruction="""あなたは請求担当の specialist です。
+必ず最初に `lookup_account` を呼び出してください。成功した場合に限り `list_invoices` を呼び出してください。
+tool から得たもの以外の数値は決して答えないでください。
+メッセージに請求に関する質問が含まれていなければ "N/A" とだけ返してください。""",
     tools=[lookup_account, list_invoices],
     output_key="billing_response",  # → state["billing_response"]
 )
@@ -44,9 +44,9 @@ shipping_agent = Agent(
     name="shipping_agent",
     model=MODEL,
     description="Looks up order status and estimated delivery dates.",
-    instruction="""You are a shipping specialist.
-Use `track_order` for the current status and `get_delivery_estimate` for the ETA.
-If the message has no shipping question, reply with "N/A".""",
+    instruction="""あなたは配送担当の specialist です。
+現在の状況は `track_order` で、到着予定日は `get_delivery_estimate` で調べてください。
+メッセージに配送に関する質問が含まれていなければ "N/A" とだけ返してください。""",
     tools=[track_order, get_delivery_estimate],
     output_key="shipping_response",  # → state["shipping_response"]
 )
@@ -55,10 +55,10 @@ returns_agent = Agent(
     name="returns_agent",
     model=MODEL,
     description="Processes customer return requests and checks return policy.",
-    instruction="""You are a returns specialist.
-Call `lookup_order`, then `check_return_policy`. Only if the order is eligible,
-call `initiate_return` and share the RMA ID.
-If the message has no return request, reply with "N/A".""",
+    instruction="""あなたは返品担当の specialist です。
+`lookup_order` を呼び出し、次に `check_return_policy` を呼び出してください。注文が返品対象の場合に限り、
+`initiate_return` を呼び出して RMA ID を伝えてください。
+メッセージに返品の依頼が含まれていなければ "N/A" とだけ返してください。""",
     tools=[lookup_order, check_return_policy, initiate_return],
     output_key="returns_response",  # → state["returns_response"]
 )

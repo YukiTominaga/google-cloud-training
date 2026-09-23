@@ -19,18 +19,18 @@ from google.adk.tools import ToolContext
 #   ❌ helper2    → ✅ get_delivery_estimate
 # =====================================================================
 def get_data(x: str) -> dict:  # ❌ 何の data を取るのか分からない
-    """Gets data."""
+    """データを取得する。"""
     return {}
 
 
 def get_delivery_estimate(order_id: str) -> dict:  # ✅ 動詞＋目的語で具体的
-    """Returns the estimated delivery date for an order.
+    """注文のお届け予定日を返す。
 
     Args:
-        order_id: The order to estimate, in the form "O-5001".
+        order_id: 予定日を調べる注文。"O-5001" の形式。
 
     Returns:
-        dict: 'status' and, on success, 'eta' (str, YYYY-MM-DD).
+        dict: 'status'。成功時は 'eta'（str、YYYY-MM-DD）も含む。
     """
     return {"status": "success", "eta": "2026-09-30"}
 
@@ -44,21 +44,21 @@ def get_delivery_estimate(order_id: str) -> dict:  # ✅ 動詞＋目的語で�
 #   3. 戻り値をどう解釈するのか（エラーケースを含む）  ← 一番抜けやすい
 # =====================================================================
 def initiate_return_weak(order_id: str) -> dict:  # ❌ 目的しか書いていない
-    """Starts a return."""
+    """返品を開始する。"""
     return {"status": "success", "rma_id": "RMA-0001"}
 
 
 def initiate_return(order_id: str) -> dict:  # ✅ 3 点が揃っている
-    """Starts a return for a delivered order and issues an RMA ID.
+    """配達済みの注文の返品を開始し、RMA ID を発行する。
 
     Args:
-        order_id: The order to return, in the form "O-5001".
+        order_id: 返品する注文。"O-5001" の形式。
 
     Returns:
-        dict: 'status' is "success" or "error".
-            On success: 'rma_id' (str) is the return authorization ID.
-            On error: 'message' (str). An error means the order is not
-            eligible for return -- do not promise a refund.
+        dict: 'status' は "success" または "error"。
+            成功時: 'rma_id'（str）は返品承認 ID。
+            エラー時: 'message'（str）。エラーはその注文が返品の対象外で
+            あることを意味する。返金を約束しないこと。
     """
     return {"status": "success", "rma_id": "RMA-0001"}
 
@@ -75,13 +75,13 @@ def bad(id) -> dict:  # ❌ 型ヒントなし
 
 
 def good(account_id: str) -> dict:  # ✅ 引数にも戻り値にも型ヒント
-    """Returns a placeholder result.
+    """仮の結果を返す。
 
     Args:
-        account_id: The unique identifier for the customer account.
+        account_id: 顧客アカウントの一意な ID。
 
     Returns:
-        dict: 'status'.
+        dict: 'status'。
     """
     return {"status": "success"}
 
@@ -94,13 +94,13 @@ def good(account_id: str) -> dict:  # ✅ 引数にも戻り値にも型ヒン�
 # session state・artifact・memory へのアクセスはすべてここ経由（M5）。
 # =====================================================================
 def fetch_account(account_id: str, tool_context: ToolContext) -> dict:
-    """Returns account data for the authenticated user.
+    """認証済みユーザーのアカウント情報を返す。
 
     Args:
-        account_id: The account to fetch.
+        account_id: 取得するアカウント。
 
     Returns:
-        dict: 'status' and, on success, 'balance'.
+        dict: 'status'。成功時は 'balance' も含む。
     """
     ...  # 中身は M5 で実装する
 
@@ -112,7 +112,7 @@ def fetch_account(account_id: str, tool_context: ToolContext) -> dict:
 # instruction に書かないと、いきなり B を呼んだり、A の失敗を無視したりする。
 # =====================================================================
 DEPENDENCY_INSTRUCTION = """
-First use `lookup_account` with the customer's account ID.
-If the account is valid, use the returned account ID to call `fetch_transactions`.
-Never call `fetch_transactions` before `lookup_account` has succeeded.
+まず、顧客のアカウント ID で `lookup_account` を使ってください。
+アカウントが有効なら、返ってきたアカウント ID で `fetch_transactions` を呼び出してください。
+`lookup_account` が成功する前に `fetch_transactions` を呼び出してはいけません。
 """

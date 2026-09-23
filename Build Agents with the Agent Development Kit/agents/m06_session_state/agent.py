@@ -39,17 +39,16 @@ _ACCOUNTS = {
 # Code 1. 4 つのスコープを 1 つの tool の中で使い分ける
 # =====================================================================
 def lookup_account(account_id: str, tool_context: ToolContext) -> dict:
-    """Returns the current balance and status for a customer account.
+    """顧客アカウントの現在の残高とステータスを返す。
 
     Args:
-        account_id: The unique identifier for the customer account,
-            in the form "A-1001".
+        account_id: 顧客アカウントの一意な ID。"A-1001" の形式。
 
     Returns:
-        dict: 'status' is "success", "error", or "denied".
-            On success: 'balance' (float, USD), 'account_status' (str) and
-            'language' (str) -- reply to the customer in that language.
-            "denied" means the signed-in customer does not own that account.
+        dict: 'status' は "success"、"error"、"denied" のいずれか。
+            成功時: 'balance'（float、USD）、'account_status'（str）、
+            'language'（str）。顧客にはその言語で返答すること。
+            "denied" はログイン中の顧客がそのアカウントの所有者ではないことを意味する。
     """
     if tool_context.state.get(state_keys.SESSION_USER_ID) != account_id:
         return {"status": "denied", "message": "Access denied."}
@@ -78,13 +77,13 @@ def lookup_account(account_id: str, tool_context: ToolContext) -> dict:
 #    直接書き換えると、イベントに残らず永続化もされない。絶対にやらない。
 # =====================================================================
 def add_to_cart(item_id: str, tool_context: ToolContext) -> dict:
-    """Adds an item to the customer's cart.
+    """顧客のカートに商品を追加する。
 
     Args:
-        item_id: The product to add, in the form "SKU-001".
+        item_id: 追加する商品。"SKU-001" の形式。
 
     Returns:
-        dict: 'status' and 'cart_size' (int) after the item was added.
+        dict: 'status' と、追加後の 'cart_size'（int）。
     """
     cart = tool_context.state.get(state_keys.CART, [])
     cart.append(item_id)
@@ -101,7 +100,7 @@ def add_to_cart(item_id: str, tool_context: ToolContext) -> dict:
 greeting_agent = LlmAgent(  # LlmAgent は Agent の別名（同じクラス）
     name="Greeter",
     model=MODEL,
-    instruction="Generate a short, friendly greeting.",
+    instruction="短く親しみやすい挨拶文を作成してください。",
     output_key="last_greeting",  # 応答を state['last_greeting'] に保存
 )
 
@@ -116,10 +115,10 @@ greeting_agent = LlmAgent(  # LlmAgent は Agent の別名（同じクラス）
 summary_agent = LlmAgent(
     name="summary_agent",
     model=MODEL,
-    instruction=f"""Combine the following into one reply to the customer.
+    instruction=f"""次の内容を、顧客への 1 つの返信にまとめてください。
 
-Billing: {{{state_keys.BILLING_RESPONSE}}}
-Shipping: {{{state_keys.SHIPPING_RESPONSE}?}}
+請求: {{{state_keys.BILLING_RESPONSE}}}
+配送: {{{state_keys.SHIPPING_RESPONSE}?}}
 """,
 )
 
@@ -131,11 +130,11 @@ billing_agent = Agent(
     name="billing_agent",
     model=MODEL,
     description="Answers billing and payment questions for the signed-in customer.",
-    instruction="""You are a billing specialist for an online retailer.
-Always call `lookup_account` before stating a balance.
-Reply in the language returned by `lookup_account`.
-You can also add items to the cart with `add_to_cart`.
-If a tool returns "denied" or "error", say so. Do not estimate.
+    instruction="""あなたはオンライン小売店の請求担当スペシャリストです。
+残高を伝える前に、必ず `lookup_account` を呼び出してください。
+`lookup_account` が返した言語で返答してください。
+`add_to_cart` でカートに商品を追加することもできます。
+tool が "denied" または "error" を返した場合は、そのことを伝えてください。概算はしないでください。
 """,
     tools=[lookup_account, add_to_cart],
     output_key=state_keys.BILLING_RESPONSE,  # Code 2：応答を state に残す

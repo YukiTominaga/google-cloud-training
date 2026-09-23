@@ -36,8 +36,8 @@ minimal_billing_agent = Agent(
     name="minimal_billing_agent",
     model=MODEL,
     instruction=(
-        "You are a billing specialist. Answer questions about account "
-        "balances, payment history, and invoices."
+        "あなたは請求担当のスペシャリストです。アカウント残高、支払い履歴、"
+        "請求書に関する質問に答えてください。"
     ),
 )
 
@@ -48,27 +48,27 @@ minimal_billing_agent = Agent(
 # 弱い版：何を扱い、何を扱わないのかが不明。
 #         配送や返品の質問にも「それっぽく」答えてしまう。
 # 強い版：次の 3 点が明示されている。
-#   1. Scope … 扱う範囲と「扱わない」範囲
-#   2. Tools … どの tool を何のために使うか
-#   3. Rules … 失敗時の振る舞い（推測で答えない）
+#   1. 対応範囲 … 扱う範囲と「扱わない」範囲
+#   2. ツール   … どの tool を何のために使うか
+#   3. ルール   … 失敗時の振る舞い（推測で答えない）
 # =====================================================================
-WEAK_INSTRUCTION = "You are a helpful customer service assistant."
+WEAK_INSTRUCTION = "あなたは親切なカスタマーサービスのアシスタントです。"
 
-STRONG_INSTRUCTION = """You are a billing specialist for an online retailer.
+STRONG_INSTRUCTION = """あなたはオンライン小売店の請求担当スペシャリストです。
 
-Scope:
-- Answer questions about account balances, payment history, and invoices.
-- Do NOT answer questions about shipping, returns, or product availability.
-  For those, say you will hand off to the right specialist.
+対応範囲:
+- アカウント残高、支払い履歴、請求書に関する質問に答えてください。
+- 配送、返品、在庫に関する質問には答えないでください（厳守）。
+  それらの質問には、適切な担当者に引き継ぐと伝えてください。
 
-Tools:
-- Use `lookup_account` to fetch the current balance for an account ID.
-- Use `list_invoices` to list recent invoices for an account ID.
+ツール:
+- アカウント ID の現在の残高を取得するには `lookup_account` を使ってください。
+- アカウント ID の直近の請求書を一覧するには `list_invoices` を使ってください。
 
-Rules:
-- Never state a balance that did not come from `lookup_account`.
-- If a tool returns {"status": "error"}, tell the customer the account
-  could not be found. Do not guess or estimate.
+ルール:
+- `lookup_account` から得たもの以外の残高は絶対に伝えないでください。
+- tool が {"status": "error"} を返した場合は、アカウントが見つからなかったと
+  顧客に伝えてください。推測や概算はしないでください。
 """
 
 
@@ -76,14 +76,14 @@ Rules:
 # Code 3 で使う tool（M1 と同じ作法：引数は文字列、戻り値は status 付き dict）
 # =====================================================================
 def lookup_account(account_id: str) -> dict:
-    """Returns the current balance and status for the given account.
+    """指定したアカウントの現在の残高とステータスを返す。
 
     Args:
-        account_id: The unique identifier for the customer account.
+        account_id: 顧客アカウントの一意な ID。
 
     Returns:
-        dict: 'status' ("success" or "error"), and on success
-              'balance' (float) and 'account_status' (str).
+        dict: 'status'（"success" または "error"）。成功時は
+              'balance'（float）と 'account_status'（str）も含む。
     """
     accounts = {"A-1001": {"balance": 128.50, "account_status": "active"}}
     if account_id not in accounts:
@@ -92,14 +92,14 @@ def lookup_account(account_id: str) -> dict:
 
 
 def list_invoices(account_id: str) -> dict:
-    """Lists the most recent invoices for the given account.
+    """指定したアカウントの直近の請求書を一覧で返す。
 
     Args:
-        account_id: The unique identifier for the customer account.
+        account_id: 顧客アカウントの一意な ID。
 
     Returns:
-        dict: 'status' ("success" or "error"), and on success
-              'invoices' (list of dicts with 'id', 'amount', 'issued_on').
+        dict: 'status'（"success" または "error"）。成功時は
+              'invoices'（'id'・'amount'・'issued_on' を持つ dict のリスト）も含む。
     """
     # M2 では固定値を返すだけ（アカウントの存在チェックは M4 で入れる）
     return {
@@ -152,7 +152,7 @@ structured_billing_agent = Agent(
     name="structured_billing_agent",
     model=MODEL,
     description="Answers billing and payment questions.",
-    instruction="Look up the account and return a BillingResult.",
+    instruction="アカウントを照会し、BillingResult を返してください。",
     tools=[lookup_account],
     output_schema=BillingResult,  # ← 応答の「形」を固定する
 )

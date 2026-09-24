@@ -11,7 +11,6 @@
 
 ```bash
 uv sync                                  # google-adk[gcp,mcp]==2.9.2 が入る
-cp agents/.env.example agents/.env       # GOOGLE_API_KEY を書き込む
 cd agents
 uv run adk web .                         # http://localhost:8000 で m01〜m13 を切り替えて試せる
 ```
@@ -56,16 +55,3 @@ uv run python check_samples.py
 
 Gemini Enterprise → アプリを選択 → Agents → Add agent → Custom agent via Agent Runtime。
 入力するのは (1) 任意の OAuth 認可設定、(2) Agent name、(3) **Description**、(4) Agent Runtime のリソースパス（`projects/PROJECT_ID/locations/LOCATION/reasoningEngines/RESOURCE_ID`）の 4 項目です。
-
-## 講師ガイドから変えた点（google-adk 2.9.2 で確認）
-
-| 場所 | ガイドの記載 | このサンプル | 理由 |
-| --- | --- | --- | --- |
-| M8 Code 6 | router が `Event(route=[...])` で該当 specialist だけ発火し、`JoinNode` で合流 | 3 つの gate ノードに常に fan-out し、担当外の gate は LLM を呼ばず `"N/A"` を返す | `JoinNode` は前段が**すべて**完了するまで待つため、3 カテゴリ全部に該当したときしか synthesizer が動かない（ダミー LLM で再現を確認済み） |
-| M8 Code 5 | instruction に `{Ticket.order_id}` | 「受け取った Ticket の order_id」と文章で指示 | `{Ticket.order_id}` は state 名として無効なので置換されず、文字のままモデルに渡る |
-| M10 Code 6 | `VertexAiSearchTool` ＋ `google_search` ＋ `McpToolset` を 1 つの agent に並べる | 検索 tool 2 つに `bypass_multi_tools_limit=True` を付与 | Gemini API は組み込み検索 tool と function calling を同じリクエストに同居させられないため |
-| M7 / M8 の `@node` | ― | `rerun_on_resume=True` を指定 | `ctx.run_node()` を使うノードはこれが無いと実行時に ValueError になる |
-| M5 `list_invoices` | `account_id` を引数で受け取る | 認可済みの `verified_account_id` を state から読む | モデルが別の ID を渡して回り込む余地をなくすため（M5 の「認可は tool に置く」を徹底） |
-| M12 Code 6 | `client.runtimes.create()` | `runtimes` が無ければ `agent_engines.create()` を使う | インストールされた SDK（1.165.1）には `agent_engines` しか無い（ガイドの「移行中」の注記どおり） |
-
-adk web でデモしやすくするため、M5・M6 ではログイン済みユーザー（`session_user_id = "A-1001"`）を callback で補っています（本来はアプリが入れる値。コメントに明記）。

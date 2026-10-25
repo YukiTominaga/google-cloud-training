@@ -56,8 +56,9 @@ gcloud artifacts repositories add-iam-policy-binding utaha \
   --member "$PRINCIPAL" --role roles/artifactregistry.writer
 
 # Cloud Run サービスの作成・更新（invoker-iam-disabled の設定に run.admin が必要）
+# プロジェクトのポリシーに条件付きバインディングがあるため --condition=None を明示する
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member "$PRINCIPAL" --role roles/run.admin
+  --member "$PRINCIPAL" --role roles/run.admin --condition=None
 
 # ランタイム SA を Cloud Run に割り当てる（actAs）
 gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA" \
@@ -76,7 +77,7 @@ for role in \
   roles/telemetry.writer \
   roles/dlp.user; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-    --member "serviceAccount:${RUNTIME_SA}" --role "$role"
+    --member "serviceAccount:${RUNTIME_SA}" --role "$role" --condition=None
 done
 
 # DLP デモで読み書きする GCS バケットに対して

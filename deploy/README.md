@@ -68,12 +68,12 @@ gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA" \
 ### 2. ランタイム SA（`training@`）
 
 アプリが利用する API に合わせて付与する（既に付与済みならスキップ）。
+Telemetry API（OTLP）へのトレース・メトリクス・ログ送信は `roles/telemetry.writer`、
+DLP デモは `roles/dlp.user` と対象バケットへのアクセスが必要。
 
 ```bash
 for role in \
-  roles/telemetry.tracesWriter \
-  roles/monitoring.metricWriter \
-  roles/logging.logWriter \
+  roles/telemetry.writer \
   roles/dlp.user; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member "serviceAccount:${RUNTIME_SA}" --role "$role"

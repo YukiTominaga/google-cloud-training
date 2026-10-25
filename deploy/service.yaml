@@ -41,6 +41,8 @@ spec:
           env:
             - name: GOOGLE_CLOUD_PROJECT
               value: utaha-io
+            - name: GOOGLE_CLOUD_QUOTA_PROJECT
+              value: utaha-io
             - name: NODE_ENV
               value: production
             # cloud.region はカスタムメトリクス(OTLP)の Cloud Monitoring 取り込みに必須（.env.example 参照）

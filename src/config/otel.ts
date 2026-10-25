@@ -78,7 +78,6 @@ class GoogleAuthOTLPExporter<T> {
     // トークンが変わった場合のみ内部エクスポーターを再生成
     if (token !== this.cachedToken || this.innerExporter === null) {
       void this.innerExporter?.shutdown();
-      const isRefresh = this.cachedToken !== null;
       this.cachedToken = token;
 
       // ユーザー認証情報（authorized_user）の場合、
@@ -90,21 +89,13 @@ class GoogleAuthOTLPExporter<T> {
       };
 
       this.innerExporter = this.buildExporter(headers);
-
-      console.log(
-        `[OTel:token:${this.signal}] ${isRefresh ? 'refreshed' : 'initialized'}` +
-          ` token=${token.slice(0, 10)}...` +
-          ` quota-project=${quotaProject || '(none)'}` +
-          ` auth-type=${this.authClient.constructor.name}`,
-      );
     }
 
     return this.innerExporter;
   }
 
+  // 成功時はログを出さず、失敗時のみ console.error で記録する
   export(data: T, resultCallback: (result: ExportResult) => void): void {
-    console.log(`[OTel:export:${this.signal}] exporting`);
-
     this.resolveExporter()
       .then((exporter) =>
         exporter.export(data, (result) => {
@@ -114,8 +105,6 @@ class GoogleAuthOTLPExporter<T> {
               `[OTel:export:${this.signal}] FAILED: ${err.message} code=${err.code ?? '?'} data=${err.data ?? '(none)'}`,
               err.stack ?? '',
             );
-          } else {
-            console.log(`[OTel:export:${this.signal}] OK`);
           }
           resultCallback(result);
         }),
@@ -165,15 +154,6 @@ export async function startOpenTelemetry(): Promise<void> {
       throw new Error('Failed to obtain access token from Application Default Credentials');
     }
 
-    console.log('[OTel:init] auth ok');
-    console.log(`[OTel:init]   auth-type         : ${authClient.constructor.name}`);
-    console.log(`[OTel:init]   endpoint (traces)  : ${TELEMETRY_ENDPOINTS.traces}`);
-    console.log(`[OTel:init]   endpoint (metrics) : ${TELEMETRY_ENDPOINTS.metrics}`);
-    console.log(`[OTel:init]   endpoint (logs)    : ${TELEMETRY_ENDPOINTS.logs}`);
-    console.log(`[OTel:init]   GOOGLE_CLOUD_PROJECT      : ${process.env.GOOGLE_CLOUD_PROJECT ?? '(not set)'}`);
-    console.log(`[OTel:init]   GOOGLE_CLOUD_QUOTA_PROJECT: ${process.env.GOOGLE_CLOUD_QUOTA_PROJECT ?? '(not set)'}`);
-    console.log(`[OTel:init]   OTEL_RESOURCE_ATTRIBUTES  : ${process.env.OTEL_RESOURCE_ATTRIBUTES ?? '(not set)'}`);
-
     // Google Cloud Telemetry API (OTLP) エンドポイントに直接送信するエクスポーター
     const traceExporter = new GoogleAuthOTLPExporter<ReadableSpan[]>(
       authClient,
@@ -220,7 +200,6 @@ export async function startOpenTelemetry(): Promise<void> {
     });
 
     sdk.start();
-    console.log('[OTel:init] SDK started (traces + metrics + logs)');
   } catch (error) {
     console.error('[OTel:init] FAILED to initialize:', error);
     // OpenTelemetry初期化に失敗してもアプリケーションは起動させる
@@ -234,7 +213,6 @@ export async function stopOpenTelemetry(): Promise<void> {
   if (!sdk) return;
   try {
     await sdk.shutdown();
-    console.log('OpenTelemetry shut down successfully');
   } catch (error) {
     console.error('Failed to shut down OpenTelemetry:', error);
   }

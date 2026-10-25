@@ -48,6 +48,10 @@ spec:
             # cloud.region はカスタムメトリクス(OTLP)の Cloud Monitoring 取り込みに必須（.env.example 参照）
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: gcp.project_id=utaha-io,cloud.region=asia-northeast1,service.name=google-cloud-training,service.version=${COMMIT_SHA}
+            # Telemetry API はメトリクスを prometheus_target リソースに書き込むため service.instance.id が必須。
+            # serviceinstance 検出器でプロセスごとに一意な UUID を付与する（既定の検出器には含まれない）
+            - name: OTEL_NODE_RESOURCE_DETECTORS
+              value: env,process,host,serviceinstance
           resources:
             limits:
               cpu: 1000m

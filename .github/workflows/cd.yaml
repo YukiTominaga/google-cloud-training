@@ -1,0 +1,133 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+    # Hono アプリのビルド・デプロイに関係するファイルが変わったときだけ実行する
+    # （Python 教材や README の更新ではデプロイしない）
+    paths:
+      - src/**
+      - package.json
+      - package-lock.json
+      - tsconfig.json
+      - Dockerfile
+      - .dockerignore
+      - deploy/service.yaml
+      - .github/workflows/cd.yaml
+  workflow_dispatch:
+
+# 同じブランチのデプロイは直列化する。実行中のデプロイを途中で止めると
+# サービスが中途半端な状態になり得るため、キャンセルはせず順番待ちにする
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+# 既定はすべて無効化し、必要な権限だけをジョブ単位で付与する
+permissions: {}
+
+env:
+  PROJECT_ID: utaha-io
+  REGION: asia-northeast1
+  SERVICE: google-cloud-training
+  IMAGE: asia-northeast1-docker.pkg.dev/utaha-io/utaha/google-cloud-training
+  WORKLOAD_IDENTITY_PROVIDER: projects/103175005729/locations/global/workloadIdentityPools/utaha-pool/providers/tominaga-provider
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # Workload Identity 連携で Google Cloud へ認証するために必要
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          # コミット SHA（フル）でタグ付けし、どのコミットのイメージかを一意に追跡できるようにする
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          # GitHub Actions のキャッシュでレイヤーを再利用し、2回目以降のビルドを高速化する
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Render service manifest
+        env:
+          # タグではなくダイジェストで指定し、デプロイされるイメージを不変にする
+          IMAGE_REF: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          sed -e "s|\${IMAGE}|${IMAGE_REF}|g" \
+              -e "s|\${COMMIT_SHA}|${COMMIT_SHA}|g" \
+              deploy/service.yaml > "${RUNNER_TEMP}/service.yaml"
+          # 置換漏れのプレースホルダが残っていたら失敗させる
+          if grep -nE '\$\{[A-Z_]+\}' "${RUNNER_TEMP}/service.yaml"; then
+            echo "::error::Unresolved placeholder in service.yaml"
+            exit 1
+          fi
+          cat "${RUNNER_TEMP}/service.yaml"
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        run: |
+          gcloud run services replace "${RUNNER_TEMP}/service.yaml" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --quiet
+          url="$(gcloud run services describe "${SERVICE}" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format 'value(status.url)')"
+          echo "url=${url}" >> "${GITHUB_OUTPUT}"
+
+      - name: Smoke test
+        env:
+          SERVICE_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          curl --fail --silent --show-error \
+            --retry 5 --retry-delay 3 --retry-all-errors --max-time 10 \
+            "${SERVICE_URL}/health"
+
+      - name: Write job summary
+        if: always()
+        env:
+          SERVICE_URL: ${{ steps.deploy.outputs.url }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          {
+            echo "### Cloud Run deploy"
+            echo ""
+            echo "| 項目 | 値 |"
+            echo "| --- | --- |"
+            echo "| Service | \`${SERVICE}\` (${REGION}) |"
+            echo "| URL | ${SERVICE_URL:-（デプロイ未完了）} |"
+            echo "| Image | \`${IMAGE}@${DIGEST:-（ビルド未完了）}\` |"
+            echo "| Commit | \`${GITHUB_SHA}\` |"
+          } >> "${GITHUB_STEP_SUMMARY}"

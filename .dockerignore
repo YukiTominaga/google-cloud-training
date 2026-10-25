@@ -1,0 +1,8 @@
+# ビルドコンテキストは許可リスト方式で最小化する。
+# Python 教材（genai/ や ADK ディレクトリ）・.git・node_modules などを送らないことで、
+# ビルドの高速化とイメージへの不要ファイル混入を防ぐ。
+*
+!src/
+!package.json
+!package-lock.json
+!tsconfig.json

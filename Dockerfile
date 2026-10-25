@@ -1,58 +1,49 @@
+# syntax=docker/dockerfile:1
+
+ARG NODE_VERSION=24
+
 # ==============================================================================
 # Build Stage
 # ==============================================================================
-FROM node:24-alpine AS builder
+FROM node:${NODE_VERSION}-alpine AS builder
 
-# セキュリティの向上のため非rootユーザーを作成
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 hono
-
-# 作業ディレクトリの設定
 WORKDIR /app
 
-# パッケージファイルをコピー（キャッシュ効率化のため最初にコピー）
+# パッケージファイルを先にコピーし、依存関係のレイヤーキャッシュを効かせる
 COPY package.json package-lock.json ./
 
 # 依存関係のインストール（本番 + 開発依存関係）
-RUN npm ci
+# npm のキャッシュは BuildKit のキャッシュマウントに置き、イメージには残さない
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund
 
-# アプリケーションのソースコードをコピー
-COPY . .
-
-# TypeScriptビルドの実行
+# アプリケーションのソースコードをコピーして TypeScript をビルド
+COPY tsconfig.json ./
+COPY src ./src
 RUN npm run build
+
+# 開発依存関係を取り除き、本番用の node_modules だけを残す
+RUN npm prune --omit=dev
 
 # ==============================================================================
 # Production Stage
 # ==============================================================================
-FROM node:24-alpine AS production
+FROM node:${NODE_VERSION}-alpine AS production
 
-# セキュリティパッケージのインストール
+# PID 1 としてシグナルを正しく転送するための init
 RUN apk add --no-cache dumb-init
 
-# 非rootユーザーを作成
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 hono
-
-# 作業ディレクトリの設定
+ENV NODE_ENV=production
 WORKDIR /app
 
-# 所有者を適切に設定
-RUN chown hono:nodejs /app
+# ベースイメージに同梱の非 root ユーザー node（UID 1000）で実行する
+COPY --chown=node:node package.json package-lock.json ./
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/dist ./dist
 
-# パッケージファイルをコピー
-COPY package.json package-lock.json ./
+USER node
 
-# 本番用依存関係のみインストール
-RUN npm ci --production && npm cache clean --force
-
-# ビルド成果物をコピー
-COPY --from=builder --chown=hono:nodejs /app/dist ./dist
-
-# 非rootユーザーに切り替え
-USER hono
-
-# ポートの公開（デフォルト3000、環境変数で変更可能）
+# ポートの公開（デフォルト3000、環境変数 PORT で変更可能）
 EXPOSE 3000
 
 # アプリケーションの起動

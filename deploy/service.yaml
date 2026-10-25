@@ -1,0 +1,72 @@
+# Cloud Run サービス定義（Knative Serving v1 互換）
+# .github/workflows/cd.yaml から `gcloud run services replace` で適用する。
+# ${IMAGE} / ${COMMIT_SHA} は CD ワークフローがデプロイ時に置換する（手動で書き換えないこと）。
+#
+# 注意: `replace` はこのファイルの内容でサービス全体を上書きする。
+# コンソールや gcloud で手動変更した設定は次回デプロイで消えるため、変更は必ずこのファイルで行う。
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: google-cloud-training
+  labels:
+    managed-by: github-actions
+  annotations:
+    run.googleapis.com/ingress: all
+    # 未認証アクセスを許可する（allUsers への roles/run.invoker 付与の代わり）
+    run.googleapis.com/invoker-iam-disabled: 'true'
+spec:
+  template:
+    metadata:
+      labels:
+        commit-sha: ${COMMIT_SHA}
+      annotations:
+        autoscaling.knative.dev/minScale: '0'
+        # 一般公開サービスのため、想定外のアクセスによる課金増を上限で抑える
+        autoscaling.knative.dev/maxScale: '3'
+        run.googleapis.com/startup-cpu-boost: 'true'
+        # OTel SDK がリクエスト外でもメトリクス（10秒間隔）・トレース・ログを送信するため、
+        # CPU を常時割り当てる（インスタンスベースの課金）
+        run.googleapis.com/cpu-throttling: 'false'
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 300
+      serviceAccountName: training@utaha-io.iam.gserviceaccount.com
+      containers:
+        - name: app
+          image: ${IMAGE}
+          ports:
+            - name: http1
+              containerPort: 3000
+          env:
+            - name: GOOGLE_CLOUD_PROJECT
+              value: utaha-io
+            - name: GOOGLE_CLOUD_QUOTA_PROJECT
+              value: utaha-io
+            - name: NODE_ENV
+              value: production
+            # cloud.region はカスタムメトリクス(OTLP)の Cloud Monitoring 取り込みに必須（.env.example 参照）
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: gcp.project_id=utaha-io,cloud.region=asia-northeast1,service.name=google-cloud-training,service.version=${COMMIT_SHA}
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          # 起動に失敗したリビジョンにはトラフィックが切り替わらない（旧リビジョンが残る）
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
+  traffic:
+    - latestRevision: true
+      percent: 100

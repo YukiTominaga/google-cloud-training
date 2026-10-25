@@ -80,7 +80,7 @@ for role in \
     --member "serviceAccount:${RUNTIME_SA}" --role "$role" --condition=None
 done
 
-# DLP デモで読み書きする GCS バケットに対して
-gcloud storage buckets add-iam-policy-binding gs://<BUCKET> \
+# DLP デモで読み書きする GCS バケット（utaha-demo）に対して
+gcloud storage buckets add-iam-policy-binding gs://utaha-demo \
   --member "serviceAccount:${RUNTIME_SA}" --role roles/storage.objectUser
 ```

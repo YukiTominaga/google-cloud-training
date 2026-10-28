@@ -69,8 +69,12 @@ gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA" \
 ### 2. ランタイム SA（`training@`）
 
 アプリが利用する API に合わせて付与する（既に付与済みならスキップ）。
-Telemetry API（OTLP）へのトレース・メトリクス・ログ送信は `roles/telemetry.writer`、
-DLP デモは `roles/dlp.user` と対象バケットへのアクセスが必要。
+
+- トレース・メトリクス: Telemetry API（OTLP）へ送信するため `roles/telemetry.writer` が必要。
+- ログ: 標準出力の構造化 JSON を Cloud Run が取り込むため、追加のロールは付与しない。
+- `roles/telemetry.writer` は `logging.logEntries.create` と `monitoring.timeSeries.create` を含む。
+  そのため `roles/logging.logWriter` と `roles/monitoring.metricWriter` は付与しない。
+- DLP デモ: `roles/dlp.user` と、対象バケットへのアクセスが必要。
 
 ```bash
 for role in \

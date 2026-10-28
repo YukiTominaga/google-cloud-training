@@ -168,7 +168,8 @@ class CloudLoggingStdoutLogExporter implements LogRecordExporter {
       ...Object.fromEntries(Object.entries(payload).filter(([key]) => !isReservedLogEntryKey(key))),
       severity: record.severityText ?? 'DEFAULT',
       // 書き出し時刻ではなく LogRecord の発生時刻を使う
-      timestamp: hrTimeToTimeStamp(record.hrTime),
+      // RFC 3339 文字列で指定できる特殊フィールドは `time`（`timestamp` は {seconds, nanos} のオブジェクト形式のみ）
+      time: hrTimeToTimeStamp(record.hrTime),
       ...(spanContext
         ? {
             'logging.googleapis.com/trace': `projects/${config.projectId}/traces/${spanContext.traceId}`,

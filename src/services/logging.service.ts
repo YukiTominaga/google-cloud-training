@@ -1,5 +1,4 @@
-import { type Span, SpanStatusCode, trace } from '@opentelemetry/api';
-import { logs, SeverityNumber } from '@opentelemetry/api-logs';
+import { type Span, SpanStatusCode, trace, logs, SeverityNumber } from '@opentelemetry/api';
 import { randomUUID } from 'crypto';
 import type { LogStructureRequest } from '../types/logging.js';
 

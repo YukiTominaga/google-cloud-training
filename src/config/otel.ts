@@ -9,7 +9,7 @@ import { CloudPropagator } from '@google-cloud/opentelemetry-cloud-trace-propaga
 import { GoogleAuth } from 'google-auth-library';
 import type { AuthClient } from 'google-auth-library';
 import type { ExportResult } from '@opentelemetry/core';
-import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base';
+import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace';
 import type { LogRecordExporter, ReadableLogRecord } from '@opentelemetry/sdk-logs';
 import type { ResourceMetrics } from '@opentelemetry/sdk-metrics';
 import { config } from './config.js';

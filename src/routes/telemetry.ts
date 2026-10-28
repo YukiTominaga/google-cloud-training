@@ -287,7 +287,7 @@ telemetry.get('/info', (c) => {
       },
       protocol: 'OTLP/HTTP (protobuf)',
       authentication: 'Application Default Credentials (ADC)',
-      propagators: ['W3C TraceContext (traceparent)', 'Google Cloud Trace (X-Cloud-Trace-Context)'],
+      propagators: ['W3C TraceContext (traceparent)', 'W3C Baggage (baggage)'],
     },
     endpoints: [
       {

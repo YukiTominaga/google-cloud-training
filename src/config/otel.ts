@@ -4,8 +4,7 @@ import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { SimpleLogRecordProcessor } from '@opentelemetry/sdk-logs';
 import { PeriodicExportingMetricReader, AggregationTemporality } from '@opentelemetry/sdk-metrics';
 import { NodeSDK } from '@opentelemetry/sdk-node';
-import { CompositePropagator, ExportResultCode, hrTimeToTimeStamp, W3CTraceContextPropagator } from '@opentelemetry/core';
-import { CloudPropagator } from '@google-cloud/opentelemetry-cloud-trace-propagator';
+import { ExportResultCode, hrTimeToTimeStamp } from '@opentelemetry/core';
 import { GoogleAuth } from 'google-auth-library';
 import type { AuthClient } from 'google-auth-library';
 import type { ExportResult } from '@opentelemetry/core';
@@ -235,8 +234,6 @@ export async function startOpenTelemetry(): Promise<void> {
           exportIntervalMillis: 10_000,
         }),
       ],
-      // traceparent および X-Cloud-Trace-Context からのトレースコンテキストを解釈できるように、
-      // W3C Trace Context と Cloud Trace 用プロパゲータの両方を登録する
       instrumentations: [
         new HttpInstrumentation({
           ignoreIncomingRequestHook: (req) => {
@@ -245,9 +242,9 @@ export async function startOpenTelemetry(): Promise<void> {
           },
         }),
       ],
-      textMapPropagator: new CompositePropagator({
-        propagators: [new W3CTraceContextPropagator(), new CloudPropagator()],
-      }),
+      // textMapPropagator は指定せず NodeSDK の既定（W3C Trace Context + Baggage）に任せる。
+      // Cloud Run の前段は X-Cloud-Trace-Context のみのリクエストにも同じ trace ID の traceparent を付与するため、
+      // Cloud Trace 用プロパゲータ（deprecated）は不要
     });
 
     sdk.start();

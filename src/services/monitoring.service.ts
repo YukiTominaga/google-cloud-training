@@ -5,7 +5,6 @@ import type { CustomMetricRequest } from '../types/monitoring.js';
 import { LoggingService } from './logging.service.js';
 
 export class MonitoringService {
-  private meter = metrics.getMeter('monitoring-service');
   private loggingService = new LoggingService();
   private gauges = new Map<string, Gauge>();
   private projectId: string;
@@ -51,7 +50,10 @@ export class MonitoringService {
   private getGauge(metricType: string, description?: string): Gauge {
     let gauge = this.gauges.get(metricType);
     if (!gauge) {
-      gauge = this.meter.createGauge(metricType, {
+      // Meter はここで取得する。ESM の import は index.ts の startOpenTelemetry() より先に評価されるため、
+      // コンストラクタ時点で取得すると MeterProvider 未登録の NOOP Meter になり、記録が捨てられる
+      // （metrics API には trace API の ProxyTracerProvider に相当する遅延差し替えの仕組みがない）
+      gauge = metrics.getMeter('monitoring-service').createGauge(metricType, {
         description: description || `Custom metric: ${metricType}`,
       });
       this.gauges.set(metricType, gauge);

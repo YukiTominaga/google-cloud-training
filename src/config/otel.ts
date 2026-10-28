@@ -132,6 +132,16 @@ class GoogleAuthOTLPExporter<T> {
 }
 
 /**
+ * 標準出力の構造化ログで Cloud Logging が LogEntry のフィールドとして解釈するキー
+ * 参考: https://cloud.google.com/logging/docs/structured-logging#special-payload-fields
+ */
+const RESERVED_LOG_ENTRY_KEYS = new Set(['severity', 'httpRequest', 'time', 'timestamp', 'timestampSeconds', 'timestampNanos']);
+
+function isReservedLogEntryKey(key: string): boolean {
+  return RESERVED_LOG_ENTRY_KEYS.has(key) || key.startsWith('logging.googleapis.com/');
+}
+
+/**
  * OTel の LogRecord を Cloud Logging の構造化 JSON として標準出力へ書き出すエクスポーター
  *
  * Telemetry API (OTLP) で送ったログは resource.type が generic_task になり、
@@ -151,7 +161,11 @@ class CloudLoggingStdoutLogExporter implements LogRecordExporter {
 
   private toLogEntry(record: ReadableLogRecord): Record<string, unknown> {
     const { body, spanContext } = record;
+    const payload = body !== null && typeof body === 'object' && !Array.isArray(body) ? body : { message: body };
     return {
+      // body にはリクエスト由来の値が入りうるため、Cloud Logging が特別扱いするキーを除外したうえで先に展開し、
+      // 後続のサーバー側で決める値（severity / timestamp / trace 等）で上書きされないようにする
+      ...Object.fromEntries(Object.entries(payload).filter(([key]) => !isReservedLogEntryKey(key))),
       severity: record.severityText ?? 'DEFAULT',
       // 書き出し時刻ではなく LogRecord の発生時刻を使う
       timestamp: hrTimeToTimeStamp(record.hrTime),
@@ -162,7 +176,6 @@ class CloudLoggingStdoutLogExporter implements LogRecordExporter {
             'logging.googleapis.com/trace_sampled': (spanContext.traceFlags & 1) === 1,
           }
         : {}),
-      ...(body !== null && typeof body === 'object' && !Array.isArray(body) ? body : { message: body }),
     };
   }
 
@@ -210,7 +223,7 @@ export async function startOpenTelemetry(): Promise<void> {
     sdk = new NodeSDK({
       traceExporter,
       // 即時に書き出し、ログの出力順・時刻をリクエスト処理と揃える
-      logRecordProcessors: [new SimpleLogRecordProcessor(new CloudLoggingStdoutLogExporter())],
+      logRecordProcessors: [new SimpleLogRecordProcessor({ exporter: new CloudLoggingStdoutLogExporter() })],
       metricReaders: [
         new PeriodicExportingMetricReader({
           exporter: metricExporter,

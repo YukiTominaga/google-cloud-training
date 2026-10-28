@@ -2,9 +2,11 @@ import { metrics } from '@opentelemetry/api';
 import type { Gauge } from '@opentelemetry/api';
 import { config, validateConfig } from '../config/config.js';
 import type { CustomMetricRequest } from '../types/monitoring.js';
+import { LoggingService } from './logging.service.js';
 
 export class MonitoringService {
   private meter = metrics.getMeter('monitoring-service');
+  private loggingService = new LoggingService();
   private gauges = new Map<string, Gauge>();
   private projectId: string;
   private isConfigValid: boolean;
@@ -71,7 +73,7 @@ export class MonitoringService {
     gauge.record(metric.value, metric.labels ?? {});
 
     if (config.enableDebugLogging) {
-      console.log('[Monitoring] Recording metric:', JSON.stringify(metric, null, 2));
+      this.loggingService.logDebug('[Monitoring] Recording metric', { ...metric });
     }
 
     console.log(`✓ Metric recorded: ${metric.metricType} = ${metric.value}`);

@@ -1,29 +1,30 @@
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-proto';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
-import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
+import { SimpleLogRecordProcessor } from '@opentelemetry/sdk-logs';
 import { PeriodicExportingMetricReader, AggregationTemporality } from '@opentelemetry/sdk-metrics';
 import { NodeSDK } from '@opentelemetry/sdk-node';
-import { CompositePropagator, ExportResultCode, W3CTraceContextPropagator } from '@opentelemetry/core';
+import { CompositePropagator, ExportResultCode, hrTimeToTimeStamp, W3CTraceContextPropagator } from '@opentelemetry/core';
 import { CloudPropagator } from '@google-cloud/opentelemetry-cloud-trace-propagator';
 import { GoogleAuth } from 'google-auth-library';
 import type { AuthClient } from 'google-auth-library';
 import type { ExportResult } from '@opentelemetry/core';
 import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base';
-import type { ReadableLogRecord } from '@opentelemetry/sdk-logs';
+import type { LogRecordExporter, ReadableLogRecord } from '@opentelemetry/sdk-logs';
 import type { ResourceMetrics } from '@opentelemetry/sdk-metrics';
+import { config } from './config.js';
 
 /**
  * OpenTelemetryの初期化
- * Google Cloud Telemetry API (OTLP) へ直接トレース・メトリクス・ログを送信するための設定
+ * トレース・メトリクスは Google Cloud Telemetry API (OTLP) へ直接送信する。
+ * ログは OTel Logs SDK で生成し、標準出力へ Cloud Logging 形式の JSON として書き出す
+ * （Cloud Run が cloud_run_revision のログとして取り込み、リクエストログと trace で紐づく）。
  * 参考: https://cloud.google.com/stackdriver/docs/reference/telemetry/overview
  */
 
 const TELEMETRY_ENDPOINTS = {
   traces: 'https://telemetry.googleapis.com/v1/traces',
   metrics: 'https://telemetry.googleapis.com/v1/metrics',
-  logs: 'https://telemetry.googleapis.com/v1/logs',
 } as const;
 
 type Signal = keyof typeof TELEMETRY_ENDPOINTS;
@@ -39,16 +40,16 @@ interface InnerExporter<T> {
 }
 
 /**
- * トークン自動更新機能付き OTLP エクスポーター（トレース・メトリクス・ログ共通）
+ * トークン自動更新機能付き OTLP エクスポーター（トレース・メトリクス共通）
  *
  * OTLP*Exporter は初期化時に Authorization ヘッダーを固定するため、
  * アクセストークン（有効期間 ~1 時間）の期限切れ後に 401 エラーが発生する。
  * このクラスは export() の都度 google-auth-library で最新トークンを取得し、
  * トークンが変わった場合にのみ内部エクスポーターを再生成することで自動更新を実現する。
  *
- * シグナル（trace/metric/log）ごとに内部エクスポーターの型が異なるため、
+ * シグナル（trace/metric）ごとに内部エクスポーターの型が異なるため、
  * ジェネリック型 T（export() に渡されるデータの型）で抽象化している。
- * export() の引数型がシグナルごとに異なる（ReadableSpan[] / ResourceMetrics / ReadableLogRecord[]）ため、
+ * export() の引数型がシグナルごとに異なる（ReadableSpan[] / ResourceMetrics）ため、
  * 単一の implements 節では全シグナルを両立できない。よって明示的な implements は付けず、
  * TypeScript の構造的部分型に委ねる。
  */
@@ -130,13 +131,53 @@ class GoogleAuthOTLPExporter<T> {
   }
 }
 
+/**
+ * OTel の LogRecord を Cloud Logging の構造化 JSON として標準出力へ書き出すエクスポーター
+ *
+ * Telemetry API (OTLP) で送ったログは resource.type が generic_task になり、
+ * trace も「trace_id のみ」で保存されるため、Cloud Run のリクエストログ
+ * （trace = projects/PROJECT_ID/traces/TRACE_ID）と入れ子表示にならない。
+ * 標準出力の JSON 行は Cloud Run が cloud_run_revision のログとして取り込み、
+ * logging.googleapis.com/* の特殊フィールドで trace/spanId を指定できるため、リクエストログと紐づく。
+ * 参考: https://cloud.google.com/logging/docs/structured-logging
+ */
+class CloudLoggingStdoutLogExporter implements LogRecordExporter {
+  export(logs: ReadableLogRecord[], resultCallback: (result: ExportResult) => void): void {
+    for (const record of logs) {
+      process.stdout.write(`${JSON.stringify(this.toLogEntry(record))}\n`);
+    }
+    resultCallback({ code: ExportResultCode.SUCCESS });
+  }
+
+  private toLogEntry(record: ReadableLogRecord): Record<string, unknown> {
+    const { body, spanContext } = record;
+    return {
+      severity: record.severityText ?? 'DEFAULT',
+      // 書き出し時刻ではなく LogRecord の発生時刻を使う
+      timestamp: hrTimeToTimeStamp(record.hrTime),
+      ...(spanContext
+        ? {
+            'logging.googleapis.com/trace': `projects/${config.projectId}/traces/${spanContext.traceId}`,
+            'logging.googleapis.com/spanId': spanContext.spanId,
+            'logging.googleapis.com/trace_sampled': (spanContext.traceFlags & 1) === 1,
+          }
+        : {}),
+      ...(body !== null && typeof body === 'object' && !Array.isArray(body) ? body : { message: body }),
+    };
+  }
+
+  async shutdown(): Promise<void> {}
+
+  async forceFlush(): Promise<void> {}
+}
+
 let sdk: NodeSDK | null = null;
 
 /**
  * OpenTelemetryを起動
  * アプリケーション起動時に最初に呼び出す必要がある
  * ADC (Application Default Credentials) を使用して認証クライアントを生成し、
- * Google Cloud Telemetry API に直接 OTLP でトレース・メトリクス・ログを送信する
+ * Google Cloud Telemetry API に直接 OTLP でトレース・メトリクスを送信する（ログは標準出力）
  */
 export async function startOpenTelemetry(): Promise<void> {
   try {
@@ -160,11 +201,6 @@ export async function startOpenTelemetry(): Promise<void> {
       'traces',
       (headers) => new OTLPTraceExporter({ url: TELEMETRY_ENDPOINTS.traces, headers }),
     );
-    const logExporter = new GoogleAuthOTLPExporter<ReadableLogRecord[]>(
-      authClient,
-      'logs',
-      (headers) => new OTLPLogExporter({ url: TELEMETRY_ENDPOINTS.logs, headers }),
-    );
     const metricExporter = new GoogleAuthOTLPExporter<ResourceMetrics>(
       authClient,
       'metrics',
@@ -173,7 +209,8 @@ export async function startOpenTelemetry(): Promise<void> {
 
     sdk = new NodeSDK({
       traceExporter,
-      logRecordProcessors: [new BatchLogRecordProcessor(logExporter)],
+      // 即時に書き出し、ログの出力順・時刻をリクエスト処理と揃える
+      logRecordProcessors: [new SimpleLogRecordProcessor(new CloudLoggingStdoutLogExporter())],
       metricReaders: [
         new PeriodicExportingMetricReader({
           exporter: metricExporter,

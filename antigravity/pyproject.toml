@@ -1,7 +1,7 @@
 [project]
 name = "antigravity"
 version = "0.1.0"
-description = "Add your description here"
+description = "Google ADK カスタムエージェント開発研修用プロジェクト"
 readme = "README.md"
 authors = [
     { name = "tominaga", email = "tominaga@utaha.io" }
@@ -10,13 +10,6 @@ requires-python = ">=3.11"
 dependencies = [
     "google-adk>=2.13.0",
 ]
-
-[project.scripts]
-antigravity = "antigravity:main"
-
-[build-system]
-requires = ["uv_build>=0.13.7,<0.14.0"]
-build-backend = "uv_build"
 
 [dependency-groups]
 dev = [

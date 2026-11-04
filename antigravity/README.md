@@ -8,6 +8,10 @@ Google ADK (Agent Development Kit) と Python を用いたカスタムエージ�
 - フィーチャー定義: [`tests/features/get_current_gcp_project.feature`](tests/features/get_current_gcp_project.feature)
 - ステップ定義: [`tests/step_defs/test_get_current_gcp_project.py`](tests/step_defs/test_get_current_gcp_project.py)
 
+## ツール一覧
+
+- `get_current_gcp_project`: 現在の gcloud アクティブプロジェクト ID を取得（仕様のみ・未実装）
+
 ## セットアップ
 
 依存パッケージのインストールと環境構築を行います。

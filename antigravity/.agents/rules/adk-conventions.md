@@ -15,6 +15,7 @@
 ```python
 from typing import Any
 
+
 def my_tool(param: str) -> dict[str, Any]:
     """ツールの処理概要（日本語）.
 

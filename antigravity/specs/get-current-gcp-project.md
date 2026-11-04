@@ -12,7 +12,7 @@ Google Cloud SDK（`gcloud` CLI）のローカル設定値（`gcloud config get-
 
 ```python
 def get_current_gcp_project() -> dict[str, str]:
-    """Retrieves the currently configured GCP project ID from the local gcloud configuration."""
+    """ローカルの gcloud 設定から現在のアクティブな GCP プロジェクト ID を取得する。"""
 ```
 
 ### 戻り値
@@ -26,10 +26,16 @@ def get_current_gcp_project() -> dict[str, str]:
 
 1. **`gcloud` CLI 未インストール / 未検出 (`FileNotFoundError`)**:
    - `{"status": "error", "error": "gcloud CLI is not installed or not found in PATH"}` を返す。例外を送出せず、エージェントがハンドリング可能な辞書形式で通知する。
-2. **`gcloud` コマンド実行失敗（非ゼロ終了コード / stderr 出力 / 空出力）**:
+2. **`gcloud` コマンド実行失敗（非ゼロ終了コード / stderr 出力）**:
    - プロジェクト未設定（`(unset)` など）や認証未完了等でコマンドが失敗した場合、stderr またはエラーメッセージを含めた `{"status": "error", "error": "<詳細>"}` を返す。
-3. **コマンド実行タイムアウト (`subprocess.TimeoutExpired`)**:
+3. **プロジェクト未設定（出力が空文字、または `(unset)`）**:
+   - `gcloud config get-value project` は未設定でも終了コード 0 で `(unset)` や空文字を返すことがある。前後の空白を除去した結果が空文字または `(unset)` の場合は成功扱いにせず、`{"status": "error", "error": "GCP project is not set"}` を返す。
+4. **コマンド実行タイムアウト (`subprocess.TimeoutExpired`)**:
    - 外部プロセスのハングを防ぐため、タイムアウト発生時は速やかに処理を打ち切り、`{"status": "error", "error": "Command execution timed out"}` を返す。
+
+### 呼び出す外部コマンド
+
+- `gcloud config get-value project`（読み取り専用。引数リスト `["gcloud", "config", "get-value", "project"]` で実行する）
 
 ### セキュリティ制約
 
@@ -60,30 +66,55 @@ Feature: Get current GCP project
   I want to retrieve the currently active GCP project ID
   So that I can safely interact with the intended GCP resources
 
-  Scenario: Successfully retrieve the active GCP project
+  Scenario 1: Successfully retrieve the active GCP project
     Given gcloud CLI is installed
     And gcloud config has active project "my-sample-project"
     When get_current_gcp_project is called
     Then the result status should be "success"
     And the result project should be "my-sample-project"
 
-  Scenario: Fail to retrieve GCP project when gcloud command fails
+  Scenario 2: Fail to retrieve GCP project when gcloud command fails
     Given gcloud CLI is installed
     And gcloud command fails with error "No project set"
     When get_current_gcp_project is called
     Then the result status should be "error"
     And the result error message should contain "No project set"
 
-  Scenario: Fail to retrieve GCP project when gcloud is not installed
+  Scenario 3: Fail to retrieve GCP project when gcloud is not installed
     Given gcloud CLI is not installed
     When get_current_gcp_project is called
     Then the result status should be "error"
     And the result error message should contain "not installed"
 
-  Scenario: Fail to retrieve GCP project when command times out
+  Scenario 4: Fail to retrieve GCP project when command times out
     Given gcloud CLI is installed
     And gcloud command times out
     When get_current_gcp_project is called
     Then the result status should be "error"
     And the result error message should contain "timed out"
+
+  Scenario 5: Fail to retrieve GCP project when gcloud returns "(unset)"
+    Given gcloud CLI is installed
+    And gcloud command succeeds with output "(unset)"
+    When get_current_gcp_project is called
+    Then the result status should be "error"
+    And the result error message should contain "not set"
+
+  Scenario 6: Fail to retrieve GCP project when gcloud returns an empty output
+    Given gcloud CLI is installed
+    And gcloud command succeeds with output ""
+    When get_current_gcp_project is called
+    Then the result status should be "error"
+    And the result error message should contain "not set"
+
+  Scenario 7: Invoke gcloud without a shell and with a timeout
+    Given gcloud CLI is installed
+    And gcloud config has active project "my-sample-project" and calls are recorded
+    When get_current_gcp_project is called
+    Then gcloud should have been invoked without a shell
+    And gcloud should have been invoked with a finite timeout
 ```
+
+## 決定の記録
+
+- `2026-11-04`: 初版作成

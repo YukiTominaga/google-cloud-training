@@ -7,8 +7,8 @@ Google Cloud 研修受講者を対象とした、Google ADK（`google-adk`, Pyth
 - `specs/`: 機能ごとの仕様（唯一の正・北極星。コードは仕様から再生成可能な使い捨てとして扱う）
 - `tests/features/`: 仕様と同一文言の Gherkin シナリオ（実行可能テストファイル）
 - `tests/step_defs/`: pytest-bdd のステップ定義
-- `tests/eval/`: agents-cli の評価データセットとメトリクス
-- `gcp_assistant/`: ADK エージェント本体
+- `tests/eval/`: agents-cli の評価データセットとメトリクス（evaluator が生成）
+- `gcp_assistant/`: ADK エージェント本体（デモで作成）
 - `.agents/`: エージェント用ハーネス（rules, agents, skills）
 
 ## コマンド（すべて uv 経由、Makefile は使用禁止）

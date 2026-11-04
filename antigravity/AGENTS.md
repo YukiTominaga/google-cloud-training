@@ -40,6 +40,8 @@ Google Cloud 研修受講者を対象とした、Google ADK（`google-adk`, Pyth
   → `evaluator`
   → `doc-writer`
 
+`/add-feature <機能の説明>`（`.agents/skills/add-feature/SKILL.md`）で、上記フロー全体をサブエージェントを順に起動して一括実行できる。
+
 ## 完了の定義
 - 全 Scenario が spec-verifier で PASS
 - reviewer に High の指摘なし

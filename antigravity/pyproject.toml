@@ -17,6 +17,9 @@ dev = [
     "pytest-bdd>=9.0.1",
     "ruff>=0.17.3",
 ]
+hooks = [
+    "opentelemetry-exporter-otlp-proto-http>=1.44.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

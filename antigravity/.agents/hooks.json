@@ -5,7 +5,7 @@
       {
         "matcher": ".*",
         "type": "command",
-        "command": "hooks/.venv/bin/python hooks/otel_gcp.py Stop",
+        "command": "../.venv/bin/python hooks/otel_gcp.py Stop",
         "timeout": 30
       }
     ]

@@ -37,6 +37,7 @@ wheels = [
 name = "antigravity"
 version = "0.1.0"
 source = { virtual = "." }
+default-groups = ["dev", "hooks"]
 dependencies = [
     { name = "google-adk" },
 ]

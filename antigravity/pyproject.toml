@@ -21,6 +21,10 @@ hooks = [
     "opentelemetry-exporter-otlp-proto-http>=1.44.0",
 ]
 
+[tool.uv]
+# uv sync で hooks グループ(agy の telemetry hook の依存)も既定で同期する
+default-groups = ["dev", "hooks"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]

@@ -4,13 +4,26 @@ Google ADK (Agent Development Kit) と Python を用いたカスタムエージ�
 
 ## 仕様の場所
 
-- 仕様書: [`specs/get-current-gcp-project.md`](specs/get-current-gcp-project.md)
-- フィーチャー定義: [`tests/features/get_current_gcp_project.feature`](tests/features/get_current_gcp_project.feature)
-- ステップ定義: [`tests/step_defs/test_get_current_gcp_project.py`](tests/step_defs/test_get_current_gcp_project.py)
+| 機能 | 仕様書 | フィーチャー定義 | ステップ定義 |
+| :--- | :--- | :--- | :--- |
+| **GCP Assistant エージェント本体** | [`specs/gcp-assistant-agent.md`](specs/gcp-assistant-agent.md) | [`tests/features/gcp_assistant_agent.feature`](tests/features/gcp_assistant_agent.feature) | [`tests/step_defs/test_gcp_assistant_agent.py`](tests/step_defs/test_gcp_assistant_agent.py) |
+| **GCP プロジェクト取得ツール** | [`specs/get-current-gcp-project.md`](specs/get-current-gcp-project.md) | [`tests/features/get_current_gcp_project.feature`](tests/features/get_current_gcp_project.feature) | [`tests/step_defs/test_get_current_gcp_project.py`](tests/step_defs/test_get_current_gcp_project.py) |
 
 ## ツール一覧
 
-- `get_current_gcp_project`: 現在の gcloud アクティブプロジェクト ID を取得（仕様のみ・未実装）
+- `get_current_gcp_project`: 現在の gcloud アクティブプロジェクト ID を安全に取得（実装済み）
+
+## エージェント構成 (`gcp_assistant`)
+
+Google ADK 2.0 の Graph API（`Workflow` + `LlmAgent`）を採用し、モデルには `"gemini-4-argon"` を使用しています。
+
+- **ワークフロー (`root_agent`)**: `Workflow(name="gcp_assistant", edges=[("START", gcp_assistant_node)])`
+- **内包ノード (`gcp_assistant_node`)**: `LlmAgent(name="gcp_assistant_node", model="gemini-4-argon", tools=[get_current_gcp_project])`
+- **システム指示 (instruction)**:
+  1. GCP プロジェクト特定時は推測を行わず `get_current_gcp_project` ツールを使用する。
+  2. 読み取り専用（read-only）操作を徹底し、リソースの変更・削除・作成は一切行わない。
+  3. アクセストークンや秘密鍵などの機密情報を会話ログや出力に含めない。
+
 
 ## セットアップ
 
@@ -81,3 +94,19 @@ ADK Web UI を起動してエージェントを実行・検証します。
 ```bash
 uv run adk web
 ```
+
+## 評価 (Evaluation)
+
+`agents-cli eval` およびローカル評価ランナーによる品質評価（シナリオ適合性、セキュリティ準拠）を実行します。
+
+```bash
+# スタンドアロン評価ランナーの実行（全9シナリオのスコア算出）
+python3 tests/eval/run_eval.py
+
+# agents-cli eval コマンド群のヘルプ確認
+agents-cli eval --help
+
+# pytest 経由での評価テスト実行
+uv run pytest tests/eval/test_eval.py
+```
+

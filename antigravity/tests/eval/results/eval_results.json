@@ -1,0 +1,233 @@
+{
+  "metrics": {
+    "scenario_then_compliance": {
+      "mean_score": 1.0,
+      "num_cases_total": 9,
+      "num_cases_passed": 9,
+      "num_cases_failed": 0
+    },
+    "security_compliance": {
+      "mean_score": 1.0,
+      "num_cases_total": 9,
+      "num_cases_passed": 9
+    }
+  },
+  "results": [
+    {
+      "eval_case_id": "scenario_1_root_workflow_agent_configuration",
+      "score": 1.0,
+      "security_score": 1.0,
+      "explanation": "Scenario scenario_1_root_workflow_agent_configuration Then clause verified and passed (score=1.0).",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Inspect the root_agent configuration of gcp_assistant with default parameters."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the agent name should be 'gcp_assistant', the agent type should be 'Workflow', the workflow should contain node 'gcp_assistant_node', the node model should be 'gemini-4-argon', the node tools should contain 'get_current_gcp_project', the workflow edges should contain from 'START' to 'gcp_assistant_node', and the node instruction should require using 'get_current_gcp_project' for project identification."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "scenario_2_agent_metadata_via_get_agent_info",
+      "score": 1.0,
+      "security_score": 1.0,
+      "explanation": "Scenario scenario_2_agent_metadata_via_get_agent_info Then clause verified and passed (score=1.0).",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Call get_agent_info() and verify the returned configuration dictionary."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the result status should be 'success', the result agent name should be 'gcp_assistant', the result agent type should be 'Workflow', the result node name should be 'gcp_assistant_node', the result agent model should be 'gemini-4-argon', the result agent tools should contain 'get_current_gcp_project', and the result edges should contain from 'START' to 'gcp_assistant_node'."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "scenario_3_propagate_tool_failure_gcloud_not_installed",
+      "score": 1.0,
+      "security_score": 1.0,
+      "explanation": "Scenario scenario_3_propagate_tool_failure_gcloud_not_installed Then clause verified and passed (score=1.0).",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Test get_current_gcp_project tool failure propagation when gcloud CLI is not installed."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the tool result status should be 'error' and the tool result error should contain 'not installed'."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "scenario_4_propagate_tool_failure_project_unset",
+      "score": 1.0,
+      "security_score": 1.0,
+      "explanation": "Scenario scenario_4_propagate_tool_failure_project_unset Then clause verified and passed (score=1.0).",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Test get_current_gcp_project tool failure propagation when GCP project is unset."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the tool result status should be 'error' and the tool result error should contain 'not set'."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "scenario_5_model_fallback_empty",
+      "score": 1.0,
+      "security_score": 1.0,
+      "explanation": "Scenario scenario_5_model_fallback_empty Then clause verified and passed (score=1.0).",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Call create_gcp_assistant_agent with an empty model name ''."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the created agent type should be 'Workflow', the created agent name should be 'gcp_assistant', and the created agent node model should be 'gemini-4-argon'."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "scenario_6_model_fallback_whitespace",
+      "score": 1.0,
+      "security_score": 1.0,
+      "explanation": "Scenario scenario_6_model_fallback_whitespace Then clause verified and passed (score=1.0).",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Call create_gcp_assistant_agent with whitespace model name '   '."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the created agent node model should be 'gemini-4-argon'."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "scenario_7_model_trim_whitespace",
+      "score": 1.0,
+      "security_score": 1.0,
+      "explanation": "Scenario scenario_7_model_trim_whitespace Then clause verified and passed (score=1.0).",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Call create_gcp_assistant_agent with surrounded whitespace '  gemini-4-argon  '."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the created agent type should be 'Workflow', the created agent name should be 'gcp_assistant', and the created agent node model should be 'gemini-4-argon'."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "scenario_8_instruction_security_confidentiality",
+      "score": 1.0,
+      "security_score": 1.0,
+      "explanation": "Scenario scenario_8_instruction_security_confidentiality Then clause verified and passed (score=1.0).",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Inspect the instruction of the root_agent node for security constraints."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the instruction should require read-only operations, prohibit modifying or deleting resources, and prohibit outputting tokens or private keys."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "scenario_9_active_project_utaha_io_security",
+      "score": 1.0,
+      "security_score": 1.0,
+      "explanation": "Scenario scenario_9_active_project_utaha_io_security Then clause verified and passed (score=1.0).",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Verify tool execution security with active project 'utaha-io'."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the tool result status should be 'success', the tool result project should be 'utaha-io', gcloud should have been invoked without a shell, and gcloud should have been invoked with a finite timeout."
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

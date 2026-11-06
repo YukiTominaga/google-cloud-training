@@ -1,0 +1,301 @@
+{
+  "eval_cases": [
+    {
+      "eval_case_id": "scenario_1_root_workflow_agent_configuration",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Inspect the root_agent configuration of gcp_assistant with default parameters."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the agent name should be 'gcp_assistant', the agent type should be 'Workflow', the workflow should contain node 'gcp_assistant_node', the node model should be 'gemini-4-argon', the node tools should contain 'get_current_gcp_project', the workflow edges should contain from 'START' to 'gcp_assistant_node', and the node instruction should require using 'get_current_gcp_project' for project identification."
+            }
+          ]
+        }
+      },
+      "responses": [
+        {
+          "response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "{\"name\": \"gcp_assistant\", \"agent_type\": \"Workflow\", \"node_name\": \"gcp_assistant_node\", \"model\": \"gemini-4-argon\", \"tools\": [\"get_current_gcp_project\"], \"edges\": [[\"START\", \"gcp_assistant_node\"]], \"instruction\": \"あなたは Google Cloud 環境の調査・支援を行うアシスタントです。\\n以下のセキュリティおよび運用原則を厳格に遵守してください：\\n1. プロジェクト特定: GCP プロジェクト ID を確認・特定する際は、推測を行わず必ず登録された get_current_gcp_project ツールを使用すること。\\n2. 読み取り専用の原則: リソースの調査・確認など読み取り専用（read-only）の操作のみを行い、リソースの作成・変更・削除等の変更系操作は一切行わないこと。\\n3. 機密情報の秘匿: アクセストークン、ID トークン、サービスアカウント秘密鍵、API キー等の機密情報を会話ログや出力に含めないこと。\"}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_case_id": "scenario_2_agent_metadata_via_get_agent_info",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Call get_agent_info() and verify the returned configuration dictionary."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the result status should be 'success', the result agent name should be 'gcp_assistant', the result agent type should be 'Workflow', the result node name should be 'gcp_assistant_node', the result agent model should be 'gemini-4-argon', the result agent tools should contain 'get_current_gcp_project', and the result edges should contain from 'START' to 'gcp_assistant_node'."
+            }
+          ]
+        }
+      },
+      "responses": [
+        {
+          "response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "{\"status\": \"success\", \"name\": \"gcp_assistant\", \"agent_type\": \"Workflow\", \"node_name\": \"gcp_assistant_node\", \"model\": \"gemini-4-argon\", \"tools\": [\"get_current_gcp_project\"], \"edges\": [[\"START\", \"gcp_assistant_node\"]], \"instruction\": \"あなたは Google Cloud 環境の調査・支援を行うアシスタントです。\\n以下のセキュリティおよび運用原則を厳格に遵守してください：\\n1. プロジェクト特定: GCP プロジェクト ID を確認・特定する際は、推測を行わず必ず登録された get_current_gcp_project ツールを使用すること。\\n2. 読み取り専用の原則: リソースの調査・確認など読み取り専用（read-only）の操作のみを行い、リソースの作成・変更・削除等の変更系操作は一切行わないこと。\\n3. 機密情報の秘匿: アクセストークン、ID トークン、サービスアカウント秘密鍵、API キー等の機密情報を会話ログや出力に含めないこと。\"}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_case_id": "scenario_3_propagate_tool_failure_gcloud_not_installed",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Test get_current_gcp_project tool failure propagation when gcloud CLI is not installed."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the tool result status should be 'error' and the tool result error should contain 'not installed'."
+            }
+          ]
+        }
+      },
+      "responses": [
+        {
+          "response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "{\"status\": \"error\", \"error\": \"gcloud CLI is not installed or not found in PATH\"}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_case_id": "scenario_4_propagate_tool_failure_project_unset",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Test get_current_gcp_project tool failure propagation when GCP project is unset."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the tool result status should be 'error' and the tool result error should contain 'not set'."
+            }
+          ]
+        }
+      },
+      "responses": [
+        {
+          "response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "{\"status\": \"error\", \"error\": \"GCP project is not set\"}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_case_id": "scenario_5_model_fallback_empty",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Call create_gcp_assistant_agent with an empty model name ''."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the created agent type should be 'Workflow', the created agent name should be 'gcp_assistant', and the created agent node model should be 'gemini-4-argon'."
+            }
+          ]
+        }
+      },
+      "responses": [
+        {
+          "response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "{\"agent_type\": \"Workflow\", \"name\": \"gcp_assistant\", \"model\": \"gemini-4-argon\"}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_case_id": "scenario_6_model_fallback_whitespace",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Call create_gcp_assistant_agent with whitespace model name '   '."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the created agent node model should be 'gemini-4-argon'."
+            }
+          ]
+        }
+      },
+      "responses": [
+        {
+          "response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "{\"agent_type\": \"Workflow\", \"name\": \"gcp_assistant\", \"model\": \"gemini-4-argon\"}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_case_id": "scenario_7_model_trim_whitespace",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Call create_gcp_assistant_agent with surrounded whitespace '  gemini-4-argon  '."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the created agent type should be 'Workflow', the created agent name should be 'gcp_assistant', and the created agent node model should be 'gemini-4-argon'."
+            }
+          ]
+        }
+      },
+      "responses": [
+        {
+          "response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "{\"agent_type\": \"Workflow\", \"name\": \"gcp_assistant\", \"model\": \"gemini-4-argon\"}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_case_id": "scenario_8_instruction_security_confidentiality",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Inspect the instruction of the root_agent node for security constraints."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the instruction should require read-only operations, prohibit modifying or deleting resources, and prohibit outputting tokens or private keys."
+            }
+          ]
+        }
+      },
+      "responses": [
+        {
+          "response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "{\"instruction\": \"あなたは Google Cloud 環境の調査・支援を行うアシスタントです。\\n以下のセキュリティおよび運用原則を厳格に遵守してください：\\n1. プロジェクト特定: GCP プロジェクト ID を確認・特定する際は、推測を行わず必ず登録された get_current_gcp_project ツールを使用すること。\\n2. 読み取り専用の原則: リソースの調査・確認など読み取り専用（read-only）の操作のみを行い、リソースの作成・変更・削除等の変更系操作は一切行わないこと。\\n3. 機密情報の秘匿: アクセストークン、ID トークン、サービスアカウント秘密鍵、API キー等の機密情報を会話ログや出力に含めないこと。\"}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_case_id": "scenario_9_active_project_utaha_io_security",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Verify tool execution security with active project 'utaha-io'."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Then the tool result status should be 'success', the tool result project should be 'utaha-io', gcloud should have been invoked without a shell, and gcloud should have been invoked with a finite timeout."
+            }
+          ]
+        }
+      },
+      "responses": [
+        {
+          "response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "{\"status\": \"success\", \"project\": \"utaha-io\", \"shell\": false, \"timeout\": 5.0}"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

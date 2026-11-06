@@ -1,0 +1,6 @@
+metrics_to_run:
+  - scenario_then_compliance
+
+custom_metrics:
+  - name: scenario_then_compliance
+    custom_function_file: judge_metric.py

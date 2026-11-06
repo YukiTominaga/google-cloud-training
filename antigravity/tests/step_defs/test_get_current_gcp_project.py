@@ -1,8 +1,9 @@
 import subprocess
 from typing import Any
 
-from gcp_assistant.tools import get_current_gcp_project
 from pytest_bdd import given, parsers, scenarios, then, when
+
+from gcp_assistant.tools import get_current_gcp_project
 
 scenarios("../features/get_current_gcp_project.feature")
 
@@ -38,7 +39,7 @@ def mock_gcloud_failure(monkeypatch: Any, error_message: str) -> None:
     monkeypatch.setattr(subprocess, "run", fake_run)
 
 
-@given(parsers.parse('gcloud command succeeds with output "{output}"'))
+@given(parsers.re(r'gcloud command succeeds with output "(?P<output>.*)"'))
 def mock_gcloud_output(monkeypatch: Any, output: str) -> None:
     """終了コード 0 で任意の標準出力を返す gcloud を模擬する。"""
 

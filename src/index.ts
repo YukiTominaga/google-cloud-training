@@ -11,6 +11,7 @@ import monitoring from './routes/monitoring.js';
 import trace from './routes/trace.js';
 import telemetry from './routes/telemetry.js';
 import dlp from './routes/dlp.js';
+import eventarc from './routes/eventarc.js';
 
 // アプリケーション設定の検証
 const configValidation = validateConfig();
@@ -70,6 +71,9 @@ app.route('/telemetry', telemetry);
 
 // DLP（Data Loss Prevention）ルートを統合
 app.route('/dlp', dlp);
+
+// Eventarc トリガーの受信ルートを統合（Firestore 変更イベントのログ出力）
+app.route('/eventarc', eventarc);
 
 serve(
   {

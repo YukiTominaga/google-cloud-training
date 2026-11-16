@@ -27,7 +27,8 @@
     "@opentelemetry/sdk-metrics": "^3.0.0",
     "@opentelemetry/sdk-node": "^0.300.0",
     "google-auth-library": "^10.6.1",
-    "hono": "^4.8.9"
+    "hono": "^4.8.9",
+    "protobufjs": "^8.8.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.17",

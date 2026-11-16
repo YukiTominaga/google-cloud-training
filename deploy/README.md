@@ -88,3 +88,71 @@ done
 gcloud storage buckets add-iam-policy-binding gs://utaha-demo \
   --member "serviceAccount:${RUNTIME_SA}" --role roles/storage.objectUser
 ```
+
+## Firestore（utaha/users）変更ログの Eventarc トリガー
+
+Firestore データベース `utaha` の `users` コレクション直下のドキュメントが作成・更新・削除されると、
+Eventarc が Cloud Run の `POST /eventarc/firestore/users`（[`src/routes/eventarc.ts`](../src/routes/eventarc.ts)）を呼び出す。
+エンドポイントは変更前（`before`）・変更後（`after`）のドキュメントと変更フィールド（`updatedFields`）を
+構造化ログ（`jsonPayload.message="Firestore users document changed"`）として出力する。
+
+- Firestore の直接イベントは `application/protobuf` でしか届かないため、アプリ側で `DocumentEventData` をデコードしている。
+- イベントタイプは `written`（作成・更新・削除すべて）。作成時は `before`、削除時は `after` が `null` になる。
+- パスパターン `users/*` はコレクション直下のドキュメントのみ対象。サブコレクションも含めるなら `users/**` にする。
+- トリガーのロケーションは Firestore データベースと同じ `asia-northeast1` にする必要がある。
+- `users` のフィールド値がそのまま Cloud Logging に残るため、個人情報を含む場合はログの閲覧権限・保持期間に注意する。
+
+```bash
+PROJECT_ID=utaha-io
+REGION=asia-northeast1
+SERVICE=google-cloud-training
+TRIGGER_SA_NAME=eventarc-firestore-users
+TRIGGER_SA=${TRIGGER_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com
+
+# 1. 必要な API を有効化
+gcloud services enable eventarc.googleapis.com firestore.googleapis.com run.googleapis.com pubsub.googleapis.com \
+  --project "$PROJECT_ID"
+
+# 2. トリガー用のサービスアカウントを作成し、イベント受信とサービス呼び出しの権限を付与
+gcloud iam service-accounts create "$TRIGGER_SA_NAME" \
+  --project "$PROJECT_ID" --display-name "Eventarc trigger for Firestore utaha/users"
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member "serviceAccount:${TRIGGER_SA}" --role roles/eventarc.eventReceiver --condition=None
+
+# service.yaml で invoker-iam-disabled にしているため現状は不要だが、
+# IAM による呼び出し認証を有効に戻しても動くよう付与しておく
+gcloud run services add-iam-policy-binding "$SERVICE" \
+  --project "$PROJECT_ID" --region "$REGION" \
+  --member "serviceAccount:${TRIGGER_SA}" --role roles/run.invoker
+
+# 3. トリガーを作成
+gcloud eventarc triggers create firestore-utaha-users-written \
+  --project "$PROJECT_ID" \
+  --location "$REGION" \
+  --destination-run-service "$SERVICE" \
+  --destination-run-region "$REGION" \
+  --destination-run-path /eventarc/firestore/users \
+  --event-filters "type=google.cloud.firestore.document.v1.written" \
+  --event-filters "database=utaha" \
+  --event-filters-path-pattern "document=users/*" \
+  --event-data-content-type "application/protobuf" \
+  --service-account "$TRIGGER_SA"
+
+# 4. 確認（トリガー作成後、イベントが流れ始めるまで最大 2 分ほどかかる）
+gcloud eventarc triggers describe firestore-utaha-users-written \
+  --project "$PROJECT_ID" --location "$REGION"
+
+# users のドキュメントを変更した後、出力されたログを確認する
+gcloud logging read \
+  'resource.type="cloud_run_revision"
+   resource.labels.service_name="google-cloud-training"
+   jsonPayload.message="Firestore users document changed"' \
+  --project "$PROJECT_ID" --limit 5 --format json
+```
+
+削除する場合:
+
+```bash
+gcloud eventarc triggers delete firestore-utaha-users-written --project "$PROJECT_ID" --location "$REGION"
+```

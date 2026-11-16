@@ -1,6 +1,7 @@
 import { metrics } from '@opentelemetry/api';
 import type { Gauge } from '@opentelemetry/api';
 import { config, validateConfig } from '../config/config.js';
+import { flushMetrics } from '../config/otel.js';
 import type { CustomMetricRequest } from '../types/monitoring.js';
 import { LoggingService } from './logging.service.js';
 
@@ -62,12 +63,9 @@ export class MonitoringService {
   }
 
   /**
-   * カスタム指標を記録
-   * gauge.record() は同期・即時実行で、実際のネットワーク送信は
-   * NodeSDK 側の PeriodicExportingMetricReader がバックグラウンドで定期的に行う
-   * @param metric - 記録するメトリックデータ
+   * カスタム指標を Gauge に記録する（送信はしない）
    */
-  sendCustomMetric(metric: CustomMetricRequest): void {
+  private recordMetric(metric: CustomMetricRequest): void {
     this.checkConfig();
     this.validateMetric(metric);
 
@@ -82,9 +80,20 @@ export class MonitoringService {
   }
 
   /**
+   * カスタム指標を記録し、Telemetry API への送信完了まで待つ
+   * Cloud Run のリクエストベース課金ではレスポンス後に CPU が絞られるため、
+   * 定期送信に任せずレスポンスを返す前に送り切る
+   * @param metric - 記録するメトリックデータ
+   */
+  async sendCustomMetric(metric: CustomMetricRequest): Promise<void> {
+    this.recordMetric(metric);
+    await flushMetrics();
+  }
+
+  /**
    * サンプル指標を送信するヘルパーメソッド
    */
-  sendSampleMetrics(): Array<{ metricType: string; value: number }> {
+  async sendSampleMetrics(): Promise<Array<{ metricType: string; value: number }>> {
     const sampleMetrics = [
       {
         metricType: 'application/request_count',
@@ -106,7 +115,7 @@ export class MonitoringService {
     // 指標を記録
     const results = [];
     for (const metric of sampleMetrics) {
-      this.sendCustomMetric({
+      this.recordMetric({
         metricType: metric.metricType,
         value: metric.value,
         description: metric.description,
@@ -121,92 +130,9 @@ export class MonitoringService {
       });
     }
 
+    await flushMetrics();
+
     return results;
-  }
-
-  /**
-   * ランダム値(1〜100)を一定間隔で指定時間だけ継続的に書き込む
-   * デモ用: 1リクエストだけで時系列データを生成できる
-   *
-   * 即座に初回の書き込みを行い、ジョブ情報を返す（以降は setInterval で継続書き込み）
-   *
-   * @param options.metricType - メトリックタイプ（デフォルト: application/demo_random）
-   * @param options.durationMinutes - 書き込みを継続する時間（分、デフォルト: 5）
-   * @param options.intervalSeconds - 書き込み間隔（秒、デフォルト: 10）
-   * @param options.labels - メトリックに付与するラベル
-   */
-  startContinuousRandomMetrics(options: {
-    metricType?: string;
-    durationMinutes?: number;
-    intervalSeconds?: number;
-    labels?: Record<string, string>;
-  } = {}): {
-    metricType: string;
-    durationMinutes: number;
-    intervalSeconds: number;
-    totalWrites: number;
-    labels: Record<string, string>;
-  } {
-    this.checkConfig();
-
-    const metricType = options.metricType || 'application/demo_random';
-    const durationMinutes = options.durationMinutes ?? 5;
-    const intervalSeconds = options.intervalSeconds ?? 10;
-    const labels = options.labels || {
-      environment: process.env.NODE_ENV || 'development',
-      instance: 'hono-server',
-    };
-
-    const intervalMs = intervalSeconds * 1000;
-    const durationMs = durationMinutes * 60 * 1000;
-    const totalWrites = Math.floor(durationMs / intervalMs);
-
-    // ランダム値(1〜100)を生成して書き込むヘルパー
-    const writeOne = () => {
-      const value = Math.floor(Math.random() * 100) + 1; // 1〜100
-      try {
-        this.sendCustomMetric({ metricType, value, labels });
-      } catch (error) {
-        console.error('[Monitoring] Continuous metric write failed:', {
-          metricType,
-          value,
-          error: error instanceof Error ? error.message : error,
-        });
-      }
-    };
-
-    // 初回の書き込み
-    try {
-      this.sendCustomMetric({ metricType, value: Math.floor(Math.random() * 100) + 1, labels });
-    } catch (error) {
-      console.error('[Monitoring] Initial continuous metric write failed:', error);
-    }
-
-    // 継続書き込みを開始
-    const startedAt = Date.now();
-    const timer = setInterval(() => {
-      // 経過時間が指定時間を超えたら停止
-      if (Date.now() - startedAt >= durationMs) {
-        clearInterval(timer);
-        console.log(
-          `✓ Continuous metric writing finished: ${metricType} (${durationMinutes} min)`,
-        );
-        return;
-      }
-      writeOne();
-    }, intervalMs);
-
-    console.log(
-      `▶ Started continuous metric writing: ${metricType} every ${intervalSeconds}s for ${durationMinutes} min (~${totalWrites + 1} points)`,
-    );
-
-    return {
-      metricType,
-      durationMinutes,
-      intervalSeconds,
-      totalWrites: totalWrites + 1, // 初回書き込みを含む
-      labels,
-    };
   }
 
   /**

@@ -2,7 +2,7 @@ import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { SimpleLogRecordProcessor } from '@opentelemetry/sdk-logs';
-import { PeriodicExportingMetricReader, AggregationTemporality } from '@opentelemetry/sdk-metrics';
+import { MetricReader, AggregationTemporality } from '@opentelemetry/sdk-metrics';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { ExportResultCode, hrTimeToTimeStamp } from '@opentelemetry/core';
 import { GoogleAuth } from 'google-auth-library';
@@ -184,7 +184,79 @@ class CloudLoggingStdoutLogExporter implements LogRecordExporter {
   async forceFlush(): Promise<void> {}
 }
 
+/**
+ * 呼び出されたときだけメトリクスを収集・送信する MetricReader
+ *
+ * Cloud Run のリクエストベース課金ではリクエスト外の CPU が絞られ、
+ * PeriodicExportingMetricReader のような定期送信は動かない。
+ * そのためメトリクスを記録した側が flushMetrics() を await し、レスポンスを返す前に送り切る。
+ * 送信失敗は呼び出し元に例外として返す。
+ *
+ * Cloud Monitoring は同じ時系列への書き込みを 5 秒に 1 点までしか受け付けない。
+ * 送信のたびに target_info や http.server.* など共通の時系列も含まれるため、
+ * 前回の送信から MIN_EXPORT_INTERVAL_MS 経つまで待ってから送り、待っている間の要求は 1 回の送信にまとめる。
+ */
+const MIN_EXPORT_INTERVAL_MS = 5_500;
+
+class OnDemandMetricReader extends MetricReader {
+  private readonly exporter: GoogleAuthOTLPExporter<ResourceMetrics>;
+  private lastExportStartedAt = 0;
+  private pending: Promise<void> | null = null;
+
+  constructor(exporter: GoogleAuthOTLPExporter<ResourceMetrics>) {
+    super({ aggregationTemporalitySelector: () => exporter.selectAggregationTemporality() });
+    this.exporter = exporter;
+  }
+
+  protected onForceFlush(): Promise<void> {
+    this.pending ??= (async () => {
+      // 待ち時間が 0 でも必ず setTimeout を挟む。同期的に下の `this.pending = null` まで進むと、
+      // `??=` の代入がその後に行われて完了済みの Promise が残り、以降の送信が行われなくなる
+      const wait = Math.max(0, this.lastExportStartedAt + MIN_EXPORT_INTERVAL_MS - Date.now());
+      await new Promise((resolve) => setTimeout(resolve, wait));
+      // 収集の直前で区切る: これ以降に来た要求は次の送信（さらに間隔を空けたもの）に回す
+      this.lastExportStartedAt = Date.now();
+      this.pending = null;
+      await this.exportOnce();
+    })();
+    return this.pending;
+  }
+
+  private async exportOnce(): Promise<void> {
+    const { resourceMetrics, errors } = await this.collect();
+    if (errors.length > 0) {
+      console.error('[OTel:collect:metrics] errors during collection:', errors);
+    }
+    if (resourceMetrics.scopeMetrics.length === 0) return;
+
+    await new Promise<void>((resolve, reject) => {
+      this.exporter.export(resourceMetrics, (result) => {
+        if (result.code === ExportResultCode.SUCCESS) resolve();
+        else reject(result.error ?? new Error('Failed to export metrics'));
+      });
+    });
+  }
+
+  protected async onShutdown(): Promise<void> {
+    // 終了時（SIGTERM の猶予中は CPU が割り当てられる）に未送信分を送ってから閉じる
+    try {
+      await this.onForceFlush();
+    } finally {
+      await this.exporter.shutdown();
+    }
+  }
+}
+
 let sdk: NodeSDK | null = null;
+let metricReader: OnDemandMetricReader | null = null;
+
+/**
+ * 記録済みのメトリクスを Telemetry API へ送信する（送り終わるまで待つ）
+ * OTel の初期化に失敗している場合は何もしない
+ */
+export async function flushMetrics(): Promise<void> {
+  await metricReader?.forceFlush();
+}
 
 /**
  * OpenTelemetryを起動
@@ -220,20 +292,13 @@ export async function startOpenTelemetry(): Promise<void> {
       (headers) => new OTLPMetricExporter({ url: TELEMETRY_ENDPOINTS.metrics, headers }),
     );
 
+    metricReader = new OnDemandMetricReader(metricExporter);
+
     sdk = new NodeSDK({
       traceExporter,
       // 即時に書き出し、ログの出力順・時刻をリクエスト処理と揃える
       logRecordProcessors: [new SimpleLogRecordProcessor({ exporter: new CloudLoggingStdoutLogExporter() })],
-      metricReaders: [
-        new PeriodicExportingMetricReader({
-          exporter: metricExporter,
-          // 同期Gaugeは直近にrecordされた値のみエクスポートされるため、
-          // /monitoring/custom-metrics/continuous デモ（デフォルト10秒間隔で書き込む）の
-          // 書き込み間隔とメトリクスリーダーの収集間隔を合わせないと、
-          // 収集タイミングの間に上書きされた値が失われ、大半の書き込みが欠落して見える
-          exportIntervalMillis: 10_000,
-        }),
-      ],
+      metricReaders: [metricReader],
       instrumentations: [
         new HttpInstrumentation({
           ignoreIncomingRequestHook: (req) => {

@@ -24,9 +24,9 @@ spec:
         # 一般公開サービスのため、想定外のアクセスによる課金増を上限で抑える
         autoscaling.knative.dev/maxScale: '3'
         run.googleapis.com/startup-cpu-boost: 'true'
-        # OTel SDK がリクエスト外でもメトリクス（10秒間隔）・トレース・ログを送信するため、
-        # CPU を常時割り当てる（インスタンスベースの課金）
-        run.googleapis.com/cpu-throttling: 'false'
+        # CPU はリクエスト処理中のみ割り当てる（リクエストベースの課金。cpu-throttling は既定の true）。
+        # メトリクスは各エンドポイントがレスポンス前に送り切る（src/config/otel.ts の OnDemandMetricReader）。
+        # トレースはバッチ送信のため、次のリクエスト時か終了時（SIGTERM）まで送信が遅れることがある
         run.googleapis.com/execution-environment: gen2
     spec:
       containerConcurrency: 80
